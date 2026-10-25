@@ -44,13 +44,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func menuItem(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
         item.target = self
-        if !key.isEmpty { item.keyEquivalentModifierMask = [.option, .shift] }
+        if !key.isEmpty { item.keyEquivalentModifierMask = [.command, .shift] }
         return item
     }
 
-    /// ⌥⇧3 全画面 / ⌥⇧4 範囲 / ⌥⇧5 ウィンドウ
+    /// ⌘⇧3 全画面 / ⌘⇧4 範囲 / ⌘⇧5 ウィンドウ（CleanShot と同じ。macOS 標準のスクリーンショットのショートカットはオフにして使う）
     private func registerHotKeys() {
-        let modifiers = optionKey | shiftKey
+        let modifiers = cmdKey | shiftKey
         let hotKeys = HotKeyCenter.shared
         hotKeys.register(keyCode: kVK_ANSI_3, modifiers: modifiers) { [weak self] in self?.capture(.fullscreen) }
         hotKeys.register(keyCode: kVK_ANSI_4, modifiers: modifiers) { [weak self] in self?.capture(.area) }
