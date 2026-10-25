@@ -1,8 +1,10 @@
 import AppKit
 
-/// Small panel in the bottom-left corner after a capture: copy, save, or drag the image out.
+/// Small panel in the bottom-left corner after a capture: copy, save, edit, or drag the image out.
 @MainActor
 final class QuickOverlay: NSObject {
+    var onEdit: ((Shot) -> Void)?
+
     private var panel: NSPanel?
     private var thumbnail: ThumbnailView?
     private var shot: Shot?
@@ -50,11 +52,13 @@ final class QuickOverlay: NSObject {
         thumbnail.imageScaling = .scaleProportionallyUpOrDown
         thumbnail.makeFile = { [weak self] in self?.shot.flatMap(Exporter.writeTemporary) }
         thumbnail.onDropped = { [weak self] in self?.close() }
+        thumbnail.onDoubleClick = { [weak self] in self?.editImage() }
         background.addSubview(thumbnail)
 
         let buttons = NSStackView(views: [
             button("コピー", #selector(copyImage)),
             button("保存", #selector(saveImage)),
+            button("編集", #selector(editImage)),
             button("閉じる", #selector(dismiss)),
         ])
         buttons.distribution = .fillEqually
@@ -99,6 +103,12 @@ final class QuickOverlay: NSObject {
         }
     }
 
+    @objc private func editImage() {
+        guard let shot else { return }
+        close()
+        onEdit?(shot)
+    }
+
     @objc private func dismiss() {
         close()
     }
@@ -136,10 +146,14 @@ private final class FirstMouseButton: NSButton {
 private final class ThumbnailView: NSImageView, NSDraggingSource {
     var makeFile: (() -> URL?)?
     var onDropped: (() -> Void)?
+    var onDoubleClick: (() -> Void)?
     private(set) var isDragging = false
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-    override func mouseDown(with event: NSEvent) {}
+
+    override func mouseDown(with event: NSEvent) {
+        if event.clickCount == 2 { onDoubleClick?() }
+    }
 
     override func mouseDragged(with event: NSEvent) {
         guard !isDragging, let image, let url = makeFile?() else { return }
