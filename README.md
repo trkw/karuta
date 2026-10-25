@@ -39,6 +39,8 @@ make install SIGN_IDENTITY="Karuta Dev"
 
 ## DMG で配布する
 
+最新版のダウンロード: [Karuta.dmg](https://github.com/trkw/karuta/releases/latest/download/Karuta.dmg)（[リリース一覧](https://github.com/trkw/karuta/releases)）
+
 ```sh
 make dmg   # build/Karuta-<バージョン>.dmg を作成
 ```

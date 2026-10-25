@@ -41,4 +41,17 @@ jobs:
         run: make dmg VERSION="$VERSION"
       - name: Publish release
         if: steps.version.outputs.skip != 'true'
-        run: gh release create "v$VERSION" build/*.dmg --target "$GITHUB_SHA" --title "Karuta $VERSION" --generate-notes
+        run: |
+          # バージョンなしの Karuta.dmg も添付し、releases/latest/download/Karuta.dmg で常に最新版を落とせるようにする
+          cp "build/Karuta-$VERSION.dmg" build/Karuta.dmg
+          base="https://github.com/$GITHUB_REPOSITORY/releases"
+          cat > build/notes.md <<EOF
+          ## ダウンロード
+
+          - [Karuta-$VERSION.dmg]($base/download/v$VERSION/Karuta-$VERSION.dmg)
+          - 常に最新版: [Karuta.dmg]($base/latest/download/Karuta.dmg)
+
+          公証していないため、初回は「システム設定」>「プライバシーとセキュリティ」の「このまま開く」で起動してください。
+          EOF
+          gh release create "v$VERSION" "build/Karuta-$VERSION.dmg" build/Karuta.dmg \
+            --target "$GITHUB_SHA" --title "Karuta $VERSION" --notes-file build/notes.md --generate-notes
