@@ -3,8 +3,11 @@ BUILD_DIR := build
 APP := $(BUILD_DIR)/$(APP_NAME).app
 # 自己署名証明書の名前を渡すと、再ビルドしても画面収録の許可が維持されます
 SIGN_IDENTITY ?= -
+# 未指定なら Support/Info.plist のバージョンを使います（例: make dmg VERSION=0.2.0）
+VERSION ?= $(shell /usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" Support/Info.plist)
+DMG := $(BUILD_DIR)/$(APP_NAME)-$(VERSION).dmg
 
-.PHONY: app run install clean
+.PHONY: app dmg run install clean
 
 app:
 	swift build -c release -Xswiftc -Osize
@@ -13,8 +16,19 @@ app:
 	cp "$$(swift build -c release --show-bin-path)/$(APP_NAME)" "$(APP)/Contents/MacOS/$(APP_NAME)"
 	strip -x "$(APP)/Contents/MacOS/$(APP_NAME)"
 	cp Support/Info.plist "$(APP)/Contents/Info.plist"
+	/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(VERSION)" "$(APP)/Contents/Info.plist"
 	codesign --force --sign "$(SIGN_IDENTITY)" "$(APP)"
 	@du -sh "$(APP)"
+
+dmg: app
+	rm -rf "$(BUILD_DIR)/dmg" "$(DMG)"
+	mkdir -p "$(BUILD_DIR)/dmg"
+	cp -R "$(APP)" "$(BUILD_DIR)/dmg/"
+	ln -s /Applications "$(BUILD_DIR)/dmg/Applications"
+	hdiutil create -volname "$(APP_NAME)" -srcfolder "$(BUILD_DIR)/dmg" -format ULFO -ov "$(DMG)"
+	rm -rf "$(BUILD_DIR)/dmg"
+	@if [ "$(SIGN_IDENTITY)" != "-" ]; then codesign --force --sign "$(SIGN_IDENTITY)" "$(DMG)"; fi
+	@du -sh "$(DMG)"
 
 run: app
 	open "$(APP)"
