@@ -5,19 +5,23 @@ import ServiceManagement
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     enum CaptureMode {
-        case area, window, fullscreen
+        case area, window, fullscreen, previousArea
     }
 
     private var statusItem: NSStatusItem?
     private let selection = SelectionController()
     private let overlay = QuickOverlay()
     private var editors: [EditorWindowController] = []
+    private var pins: [PinWindow] = []
+    /// The last area selection (AppKit global coordinates) and its display, for "前回の範囲を撮影".
+    private var lastArea: (rect: CGRect, displayID: CGDirectDisplayID)?
     private var isCapturing = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setUpStatusItem()
         registerHotKeys()
         overlay.onEdit = { [weak self] shot in self?.openEditor(shot) }
+        overlay.onPin = { [weak self] shot, frame in self?.pin(shot, near: frame) }
         if !CGPreflightScreenCaptureAccess() {
             CGRequestScreenCaptureAccess()
         }
@@ -33,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(menuItem("範囲を撮影", #selector(captureArea), key: "4"))
         menu.addItem(menuItem("ウィンドウを撮影", #selector(captureWindow), key: "5"))
         menu.addItem(menuItem("全画面を撮影", #selector(captureFullscreen), key: "3"))
+        menu.addItem(menuItem("前回の範囲を撮影", #selector(capturePreviousArea)))
         menu.addItem(.separator())
         let login = menuItem("ログイン時に起動", #selector(toggleLoginItem(_:)))
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
@@ -83,6 +88,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func captureArea() { capture(.area) }
     @objc private func captureWindow() { capture(.window) }
     @objc private func captureFullscreen() { capture(.fullscreen) }
+    @objc private func capturePreviousArea() { capture(.previousArea) }
 
     @objc private func toggleLoginItem(_ sender: NSMenuItem) {
         let service = SMAppService.mainApp
@@ -113,6 +119,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case .fullscreen:
                     screen = NSScreen.underMouse
                     shot = try await Capturer.captureDisplay(of: screen, rect: nil, content: content)
+                case .previousArea:
+                    guard let last = self.lastArea,
+                          let lastScreen = NSScreen.screens.first(where: { $0.displayID == last.displayID })
+                    else {
+                        NSSound.beep()
+                        return
+                    }
+                    screen = lastScreen
+                    shot = try await Capturer.captureDisplay(of: screen, rect: last.rect, content: content)
                 case .area, .window:
                     let candidates = Capturer.orderedWindows(in: content)
                     switch await self.selection.run(windowMode: mode == .window, candidates: candidates) {
@@ -120,6 +135,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         return
                     case let .area(rect, selectedScreen):
                         screen = selectedScreen
+                        if let id = screen.displayID { self.lastArea = (rect, id) }
                         shot = try await Capturer.captureDisplay(of: screen, rect: rect, content: content)
                     case let .window(window):
                         screen = NSScreen.underMouse
@@ -132,6 +148,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if !CGPreflightScreenCaptureAccess() { self.showPermissionAlert() }
             }
         }
+    }
+
+    private func pin(_ shot: Shot, near frame: NSRect) {
+        let window = PinWindow(shot: shot, frame: frame)
+        window.onClose = { [weak self, weak window] in
+            self?.pins.removeAll { $0 === window }
+        }
+        pins.append(window)
+        window.orderFrontRegardless()
     }
 
     private func openEditor(_ shot: Shot) {
