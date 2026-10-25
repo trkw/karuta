@@ -238,7 +238,15 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func handleCommand(_ key: String) -> Bool {
-        guard !canvas.isEditingText else { return false }
+        if canvas.isEditingText {
+            // Without an Edit menu, the text field's standard editing shortcuts need to be sent by hand.
+            let actions: [String: Selector] = [
+                "c": #selector(NSText.copy(_:)), "v": #selector(NSText.paste(_:)),
+                "x": #selector(NSText.cut(_:)), "a": #selector(NSText.selectAll(_:)),
+            ]
+            guard let action = actions[key] else { return false }
+            return NSApp.sendAction(action, to: nil, from: self)
+        }
         switch key {
         case "c": copyImage()
         case "s": saveImage()
