@@ -11,11 +11,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private let selection = SelectionController()
     private let overlay = QuickOverlay()
+    private var editors: [EditorWindowController] = []
     private var isCapturing = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setUpStatusItem()
         registerHotKeys()
+        overlay.onEdit = { [weak self] shot in self?.openEditor(shot) }
         if !CGPreflightScreenCaptureAccess() {
             CGRequestScreenCaptureAccess()
         }
@@ -111,6 +113,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if !CGPreflightScreenCaptureAccess() { self.showPermissionAlert() }
             }
         }
+    }
+
+    private func openEditor(_ shot: Shot) {
+        let editor = EditorWindowController(shot: shot)
+        editor.onClose = { [weak self, weak editor] in
+            self?.editors.removeAll { $0 === editor }
+        }
+        editors.append(editor)
+        NSApp.activate()
+        editor.showWindow(nil)
     }
 
     private func showPermissionAlert() {
