@@ -49,6 +49,8 @@ make dmg   # build/Karuta-<バージョン>.dmg を作成
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
+タグを打つ代わりに、GitHub の Actions タブで「Release」ワークフローを選び、「Run workflow」にバージョンを入れて実行しても同じリリースが作られます。
+
 PR や main への push でも DMG がビルドされ、Actions の実行結果からダウンロードできます（7 日間保存）。
 
 ### DMG から入れるとき
