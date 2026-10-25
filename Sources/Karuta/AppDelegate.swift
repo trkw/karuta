@@ -11,11 +11,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private let selection = SelectionController()
     private let overlay = QuickOverlay()
+    private var editors: [EditorWindowController] = []
     private var isCapturing = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setUpStatusItem()
         registerHotKeys()
+        overlay.onEdit = { [weak self] shot in self?.openEditor(shot) }
         if !CGPreflightScreenCaptureAccess() {
             CGRequestScreenCaptureAccess()
         }
@@ -25,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setUpStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = Self.menuBarImage()
+        item.button?.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Karuta")
 
         let menu = NSMenu()
         menu.addItem(menuItem("範囲を撮影", #selector(captureArea), key: "4"))
@@ -41,35 +43,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = item
     }
 
-    /// メニューバー用のテンプレート画像（傾けた札と中央の点）。画像ファイルを持たずにコードで描く
-    private static func menuBarImage() -> NSImage {
-        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
-            let transform = NSAffineTransform()
-            transform.translateX(by: 9, yBy: 9)
-            transform.rotate(byDegrees: 8)
-            transform.concat()
-            NSColor.black.set()
-            let card = NSBezierPath(roundedRect: NSRect(x: -4.5, y: -6, width: 9, height: 12), xRadius: 1.6, yRadius: 1.6)
-            card.lineWidth = 1.5
-            card.stroke()
-            NSBezierPath(ovalIn: NSRect(x: -1.7, y: -1.7, width: 3.4, height: 3.4)).fill()
-            return true
-        }
-        image.isTemplate = true
-        image.accessibilityDescription = "Karuta"
-        return image
-    }
-
     private func menuItem(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
         item.target = self
-        if !key.isEmpty { item.keyEquivalentModifierMask = [.option, .shift] }
+        if !key.isEmpty { item.keyEquivalentModifierMask = [.command, .shift] }
         return item
     }
 
-    /// ⌥⇧3 全画面 / ⌥⇧4 範囲 / ⌥⇧5 ウィンドウ
+    /// ⌘⇧3 全画面 / ⌘⇧4 範囲 / ⌘⇧5 ウィンドウ（CleanShot と同じ。macOS 標準のスクリーンショットのショートカットはオフにして使う）
     private func registerHotKeys() {
-        let modifiers = optionKey | shiftKey
+        let modifiers = cmdKey | shiftKey
         let hotKeys = HotKeyCenter.shared
         hotKeys.register(keyCode: kVK_ANSI_3, modifiers: modifiers) { [weak self] in self?.capture(.fullscreen) }
         hotKeys.register(keyCode: kVK_ANSI_4, modifiers: modifiers) { [weak self] in self?.capture(.area) }
@@ -130,6 +113,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if !CGPreflightScreenCaptureAccess() { self.showPermissionAlert() }
             }
         }
+    }
+
+    private func openEditor(_ shot: Shot) {
+        let editor = EditorWindowController(shot: shot)
+        editor.onClose = { [weak self, weak editor] in
+            self?.editors.removeAll { $0 === editor }
+        }
+        editors.append(editor)
+        NSApp.activate()
+        editor.showWindow(nil)
     }
 
     private func showPermissionAlert() {
