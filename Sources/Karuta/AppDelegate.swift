@@ -13,7 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let overlay = QuickOverlay()
     private var editors: [EditorWindowController] = []
     private var pins: [PinWindow] = []
-    /// The last area selection (AppKit global coordinates) and its display, for "前回の範囲を撮影".
+    /// The last area selection, relative to its display's origin (so it survives display rearrangement),
+    /// for "前回の範囲を撮影".
     private var lastArea: (rect: CGRect, displayID: CGDirectDisplayID)?
     private var isCapturing = false
 
@@ -126,17 +127,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         NSSound.beep()
                         return
                     }
+                    let rect = last.rect.offsetBy(dx: lastScreen.frame.minX, dy: lastScreen.frame.minY)
+                        .intersection(lastScreen.frame)
+                    guard !rect.isEmpty else {
+                        NSSound.beep()
+                        return
+                    }
                     screen = lastScreen
-                    shot = try await Capturer.captureDisplay(of: screen, rect: last.rect, content: content)
+                    shot = try await Capturer.captureDisplay(of: screen, rect: rect, content: content)
                 case .area, .window:
                     let candidates = Capturer.orderedWindows(in: content)
-                    switch await self.selection.run(windowMode: mode == .window, candidates: candidates) {
+                    // Freeze the screen first, so the selection is made on (and cut from) a still image.
+                    let frozen = await Capturer.freezeDisplays(content: content)
+                    let result = await self.selection.run(windowMode: mode == .window, candidates: candidates,
+                                                          frozen: frozen)
+                    switch result {
                     case .cancelled:
                         return
                     case let .area(rect, selectedScreen):
                         screen = selectedScreen
-                        if let id = screen.displayID { self.lastArea = (rect, id) }
-                        shot = try await Capturer.captureDisplay(of: screen, rect: rect, content: content)
+                        let id = screen.displayID
+                        if let id { self.lastArea = (rect.offsetBy(dx: -screen.frame.minX, dy: -screen.frame.minY), id) }
+                        if let full = id.flatMap({ frozen[$0] }), let cropped = Capturer.crop(full, to: rect, on: screen) {
+                            shot = cropped
+                        } else {
+                            shot = try await Capturer.captureDisplay(of: screen, rect: rect, content: content)
+                        }
                     case let .window(window):
                         screen = NSScreen.underMouse
                         shot = try await Capturer.captureWindow(window)
