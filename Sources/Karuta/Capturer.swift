@@ -48,6 +48,37 @@ enum Capturer {
         return Shot(image: image, scale: scale)
     }
 
+    /// Captures every display in full, so area selection can happen on a frozen screen (CleanShot's "Freeze screen").
+    static func freezeDisplays(content: SCShareableContent) async -> [CGDirectDisplayID: Shot] {
+        var shots: [CGDirectDisplayID: Shot] = [:]
+        for screen in NSScreen.screens {
+            guard let id = screen.displayID else { continue }
+            shots[id] = try? await captureDisplay(of: screen, rect: nil, content: content)
+        }
+        return shots
+    }
+
+    /// Cuts `rect` (AppKit global coordinates) out of a full-display `shot` of `screen`.
+    /// The result is copied into its own bitmap so the full frozen image can be released.
+    static func crop(_ shot: Shot, to rect: CGRect, on screen: NSScreen) -> Shot? {
+        let scale = shot.scale
+        let pixels = CGRect(
+            x: (rect.minX - screen.frame.minX) * scale,
+            y: (screen.frame.maxY - rect.maxY) * scale,
+            width: rect.width * scale, height: rect.height * scale
+        ).integral.intersection(CGRect(x: 0, y: 0, width: shot.image.width, height: shot.image.height))
+        guard !pixels.isEmpty, let cropped = shot.image.cropping(to: pixels) else { return nil }
+
+        let colorSpace = cropped.colorSpace ?? CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: nil, width: cropped.width, height: cropped.height, bitsPerComponent: 8, bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        ) else { return Shot(image: cropped, scale: scale) }
+        context.draw(cropped, in: CGRect(x: 0, y: 0, width: cropped.width, height: cropped.height))
+        return context.makeImage().map { Shot(image: $0, scale: scale) }
+    }
+
     static func captureWindow(_ window: SCWindow) async throws -> Shot {
         let filter = SCContentFilter(desktopIndependentWindow: window)
         let scale = CGFloat(filter.pointPixelScale)

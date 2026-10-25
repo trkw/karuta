@@ -130,13 +130,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     shot = try await Capturer.captureDisplay(of: screen, rect: last.rect, content: content)
                 case .area, .window:
                     let candidates = Capturer.orderedWindows(in: content)
-                    switch await self.selection.run(windowMode: mode == .window, candidates: candidates) {
+                    // Freeze the screen first, so the selection is made on (and cut from) a still image.
+                    let frozen = await Capturer.freezeDisplays(content: content)
+                    let result = await self.selection.run(windowMode: mode == .window, candidates: candidates,
+                                                          frozen: frozen)
+                    switch result {
                     case .cancelled:
                         return
                     case let .area(rect, selectedScreen):
                         screen = selectedScreen
-                        if let id = screen.displayID { self.lastArea = (rect, id) }
-                        shot = try await Capturer.captureDisplay(of: screen, rect: rect, content: content)
+                        let id = screen.displayID
+                        if let id { self.lastArea = (rect, id) }
+                        if let full = id.flatMap({ frozen[$0] }), let cropped = Capturer.crop(full, to: rect, on: screen) {
+                            shot = cropped
+                        } else {
+                            shot = try await Capturer.captureDisplay(of: screen, rect: rect, content: content)
+                        }
                     case let .window(window):
                         screen = NSScreen.underMouse
                         shot = try await Capturer.captureWindow(window)
