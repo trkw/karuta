@@ -39,17 +39,17 @@ make install SIGN_IDENTITY="Karuta Dev"
 
 ## DMG で配布する
 
+最新版のダウンロード: [Karuta.dmg](https://github.com/trkw/karuta/releases/latest/download/Karuta.dmg)（[リリース一覧](https://github.com/trkw/karuta/releases)）
+
 ```sh
 make dmg   # build/Karuta-<バージョン>.dmg を作成
 ```
 
-`v0.2.0` のようなタグを push すると、GitHub Actions が DMG をビルドして GitHub Release に添付します。バージョンはタグから付けられます。
+リリースは次のどれかで作られます。DMG は GitHub Release に添付されます。
 
-```sh
-git tag v0.2.0 && git push origin v0.2.0
-```
-
-タグを打つ代わりに、GitHub の Actions タブで「Release」ワークフローを選び、「Run workflow」にバージョンを入れて実行しても同じリリースが作られます。
+- **バージョンを上げて main にマージする：** `Support/Info.plist` の `CFBundleShortVersionString` を上げると、そのバージョンのリリースがまだなければ自動で作られます。
+- **タグを push する：** `git tag v0.2.0 && git push origin v0.2.0`
+- **Actions タブから実行する：** 「Release」ワークフローの「Run workflow」にバージョンを入れて実行します。
 
 PR や main への push でも DMG がビルドされ、Actions の実行結果からダウンロードできます（7 日間保存）。
 
