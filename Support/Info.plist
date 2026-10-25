@@ -8,6 +8,8 @@
 	<string>Karuta</string>
 	<key>CFBundleExecutable</key>
 	<string>Karuta</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.trkw.karuta</string>
 	<key>CFBundleInfoDictionaryVersion</key>
