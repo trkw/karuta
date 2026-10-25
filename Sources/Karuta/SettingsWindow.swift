@@ -25,9 +25,21 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.delegate = self
+        // The page scrolls when the screen is too short to show it whole.
         let content = makeContent()
-        window.contentView = content
-        window.setContentSize(content.fittingSize)
+        let scrollView = NSScrollView()
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
+        scrollView.documentView = content
+        content.translatesAutoresizingMaskIntoConstraints = false
+        content.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor).isActive = true
+        content.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor).isActive = true
+        window.contentView = scrollView
+
+        let fitting = content.fittingSize
+        let available = (NSScreen.main?.visibleFrame.height ?? fitting.height) - 40
+        window.setContentSize(NSSize(width: fitting.width, height: min(fitting.height, available)))
         window.center()
     }
 
@@ -35,6 +47,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     required init?(coder: NSCoder) { fatalError() }
 
     func windowWillClose(_ notification: Notification) {
+        // A shortcut field may still be recording (hot keys paused); always bring them back.
+        onRecordingShortcut?(false)
         onClose?()
     }
 
@@ -80,7 +94,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             view.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -48).isActive = true
         }
 
-        let content = NSView()
+        let content = FlippedView()
         content.addSubview(stack)
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: content.topAnchor),
@@ -192,6 +206,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private static func folderName(_ url: URL) -> String {
         FileManager.default.displayName(atPath: url.path)
     }
+}
+
+/// Top-aligned document view for the scroll view.
+private final class FlippedView: NSView {
+    override var isFlipped: Bool { true }
 }
 
 /// There is no main menu, so ⌘W is handled here.
