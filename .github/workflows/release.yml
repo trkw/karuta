@@ -2,6 +2,8 @@ name: Release
 
 on:
   push:
+    branches: [main]
+    paths: ["Support/Info.plist", ".github/workflows/release.yml"]
     tags: ["v*"]
   workflow_dispatch:
     inputs:
@@ -15,21 +17,28 @@ permissions:
 jobs:
   release:
     runs-on: macos-15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      INPUT_VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
       - name: Resolve version
-        env:
-          INPUT_VERSION: ${{ inputs.version }}
+        id: version
         run: |
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            version="${INPUT_VERSION#v}"
-          else
-            version="${GITHUB_REF_NAME#v}"
-          fi
+          case "$GITHUB_EVENT_NAME:$GITHUB_REF_TYPE" in
+            workflow_dispatch:*) version="${INPUT_VERSION#v}" ;;
+            push:tag) version="${GITHUB_REF_NAME#v}" ;;
+            *) version="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Support/Info.plist)" ;;
+          esac
           echo "VERSION=$version" >> "$GITHUB_ENV"
+          # main への push では、まだリリースのないバージョンのときだけ作成する
+          if gh release view "v$version" >/dev/null 2>&1; then
+            echo "v$version は既にリリース済みです"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Build DMG
+        if: steps.version.outputs.skip != 'true'
         run: make dmg VERSION="$VERSION"
       - name: Publish release
-        env:
-          GH_TOKEN: ${{ github.token }}
+        if: steps.version.outputs.skip != 'true'
         run: gh release create "v$VERSION" build/*.dmg --target "$GITHUB_SHA" --title "Karuta $VERSION" --generate-notes
