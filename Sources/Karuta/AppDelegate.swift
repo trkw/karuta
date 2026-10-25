@@ -13,7 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let overlay = QuickOverlay()
     private var editors: [EditorWindowController] = []
     private var pins: [PinWindow] = []
-    /// The last area selection (AppKit global coordinates) and its display, for "前回の範囲を撮影".
+    /// The last area selection, relative to its display's origin (so it survives display rearrangement),
+    /// for "前回の範囲を撮影".
     private var lastArea: (rect: CGRect, displayID: CGDirectDisplayID)?
     private var isCapturing = false
 
@@ -126,8 +127,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         NSSound.beep()
                         return
                     }
+                    let rect = last.rect.offsetBy(dx: lastScreen.frame.minX, dy: lastScreen.frame.minY)
+                        .intersection(lastScreen.frame)
+                    guard !rect.isEmpty else {
+                        NSSound.beep()
+                        return
+                    }
                     screen = lastScreen
-                    shot = try await Capturer.captureDisplay(of: screen, rect: last.rect, content: content)
+                    shot = try await Capturer.captureDisplay(of: screen, rect: rect, content: content)
                 case .area, .window:
                     let candidates = Capturer.orderedWindows(in: content)
                     // Freeze the screen first, so the selection is made on (and cut from) a still image.
@@ -140,7 +147,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     case let .area(rect, selectedScreen):
                         screen = selectedScreen
                         let id = screen.displayID
-                        if let id { self.lastArea = (rect, id) }
+                        if let id { self.lastArea = (rect.offsetBy(dx: -screen.frame.minX, dy: -screen.frame.minY), id) }
                         if let full = id.flatMap({ frozen[$0] }), let cropped = Capturer.crop(full, to: rect, on: screen) {
                             shot = cropped
                         } else {

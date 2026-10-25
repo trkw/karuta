@@ -140,8 +140,8 @@ private final class SelectionView: NSView {
 
     private var isDragging: Bool { anchor != nil }
 
-    /// The selection in view coordinates, shaped by Shift (square) and Option (from center), snapped to points.
-    private var selection: NSRect? {
+    /// The selection as shaped by Shift (square) and Option (from center), before clipping to the screen.
+    private var rawSelection: NSRect? {
         guard let anchor, let current else { return nil }
         var dx = current.x - anchor.x
         var dy = current.y - anchor.y
@@ -150,9 +150,14 @@ private final class SelectionView: NSView {
             dx = dx < 0 ? -side : side
             dy = dy < 0 ? -side : side
         }
-        let rect = modifiers.contains(.option)
+        return modifiers.contains(.option)
             ? NSRect(x: anchor.x - abs(dx), y: anchor.y - abs(dy), width: abs(dx) * 2, height: abs(dy) * 2)
             : NSRect(x: min(anchor.x, anchor.x + dx), y: min(anchor.y, anchor.y + dy), width: abs(dx), height: abs(dy))
+    }
+
+    /// The selection in view coordinates, clipped to the screen and snapped to points.
+    private var selection: NSRect? {
+        guard let rect = rawSelection else { return nil }
         let clipped = rect.intersection(bounds)
         guard !clipped.isNull else { return nil }
         let minX = clipped.minX.rounded(), minY = clipped.minY.rounded()
@@ -238,11 +243,15 @@ private final class SelectionView: NSView {
     }
 
     private func dragTo(_ point: NSPoint) {
-        if spaceHeld, let anchor, let lastDrag {
-            // Space held: move the whole selection instead of resizing it.
-            self.anchor = NSPoint(x: anchor.x + point.x - lastDrag.x, y: anchor.y + point.y - lastDrag.y)
+        if spaceHeld, let anchor, let current, let lastDrag, let rect = rawSelection {
+            // Space held: move the whole selection instead of resizing it, stopping at the screen edges.
+            let dx = min(max(point.x - lastDrag.x, bounds.minX - rect.minX), bounds.maxX - rect.maxX)
+            let dy = min(max(point.y - lastDrag.y, bounds.minY - rect.minY), bounds.maxY - rect.maxY)
+            self.anchor = NSPoint(x: anchor.x + dx, y: anchor.y + dy)
+            self.current = NSPoint(x: current.x + dx, y: current.y + dy)
+        } else {
+            current = point
         }
-        current = point
         lastDrag = point
         needsDisplay = true
     }
