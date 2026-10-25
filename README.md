@@ -37,10 +37,25 @@ make install   # /Applications にコピー
 make install SIGN_IDENTITY="Karuta Dev"
 ```
 
-### CI のビルドを使う場合
-
-GitHub Actions がビルドした `Karuta.zip` を Actions の実行結果からダウンロードできます。署名・公証していないため、展開後に次を実行してから開いてください。
+## DMG で配布する
 
 ```sh
-xattr -dr com.apple.quarantine Karuta.app
+make dmg   # build/Karuta-<バージョン>.dmg を作成
 ```
+
+`v0.2.0` のようなタグを push すると、GitHub Actions が DMG をビルドして GitHub Release に添付します。バージョンはタグから付けられます。
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+PR や main への push でも DMG がビルドされ、Actions の実行結果からダウンロードできます（7 日間保存）。
+
+### DMG から入れるとき
+
+Apple の公証を受けていないため、ダウンロードした DMG のアプリは初回起動時に Gatekeeper にブロックされます。Applications にコピーしたあと、次のどちらかで開いてください。
+
+- 「システム設定」>「プライバシーとセキュリティ」に出る「このまま開く」を押す
+- ターミナルで `xattr -dr com.apple.quarantine /Applications/Karuta.app` を実行する
+
+警告なしで配布するには、Apple Developer Program（年 99 USD）の Developer ID 署名と公証が必要です。

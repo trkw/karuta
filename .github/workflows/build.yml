@@ -10,12 +10,10 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Build app
-        run: make app
-      - name: Zip app
-        run: cd build && ditto -c -k --keepParent Karuta.app Karuta.zip
+      - name: Build DMG
+        run: make dmg
       - uses: actions/upload-artifact@v4
         with:
           name: Karuta
-          path: build/Karuta.zip
+          path: build/*.dmg
           retention-days: 7
