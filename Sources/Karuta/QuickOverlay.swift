@@ -26,8 +26,9 @@ final class QuickOverlay {
         card.alphaValue = 0
         card.orderFrontRegardless()
         cards.insert(card, at: 0)
-        while cards.count > Self.maxCards, let oldest = cards.last {
-            remove(oldest, animated: true)
+        // Keep at most maxCards, and drop the oldest cards that would stack above the top of the screen.
+        while let excess = cards.count > Self.maxCards ? cards.last : stack().overflow {
+            remove(excess, animated: true)
         }
         layout(animated: true)
     }
@@ -78,15 +79,26 @@ final class QuickOverlay {
         layout(animated: animated)
     }
 
-    private func layout(animated: Bool) {
+    /// The y of each card (newest at the bottom, per screen), and the oldest card on a screen whose stack
+    /// no longer fits below that screen's top edge.
+    private func stack() -> (y: [ObjectIdentifier: CGFloat], overflow: OverlayCard?) {
         var y: [ObjectIdentifier: CGFloat] = [:]
         var nextY: [CGFloat: CGFloat] = [:] // per screen (keyed by its minY+minX), the next free y
+        var overflow: OverlayCard?
         for card in cards {
             let key = card.screenFrame.minX * 100_000 + card.screenFrame.minY
             let base = nextY[key] ?? card.screenFrame.minY + Self.margin
             y[ObjectIdentifier(card)] = base
             nextY[key] = base + card.frame.height + Self.spacing
+            if base > card.screenFrame.minY + Self.margin, base + card.frame.height > card.screenFrame.maxY - Self.margin {
+                overflow = cards.last { $0.screenFrame == card.screenFrame }
+            }
         }
+        return (y, overflow)
+    }
+
+    private func layout(animated: Bool) {
+        let y = stack().y
         NSAnimationContext.runAnimationGroup { context in
             context.duration = animated ? 0.25 : 0
             context.allowsImplicitAnimation = true
@@ -225,13 +237,31 @@ private final class CardView: NSView, NSDraggingSource {
 
     override var acceptsFirstResponder: Bool { true }
 
+    /// Our window that had keyboard focus before hovering (e.g. an editor), restored on exit.
+    private weak var previousKeyWindow: NSWindow?
+
     override func mouseEntered(with event: NSEvent) {
         setHover(true)
+        if let key = NSApp.keyWindow, key !== window { previousKeyWindow = key }
         window?.makeKey()
         window?.makeFirstResponder(self)
     }
 
-    override func mouseExited(with event: NSEvent) { setHover(false) }
+    override func mouseExited(with event: NSEvent) {
+        setHover(false)
+        restoreKeyboardFocus()
+    }
+
+    /// Shortcuts only apply while hovering: hand keyboard focus back to whoever had it.
+    private func restoreKeyboardFocus() {
+        guard let window, window.isKeyWindow else { return }
+        if let previous = previousKeyWindow, previous.isVisible {
+            previous.makeKey()
+        } else if !NSApp.isActive, let app = NSWorkspace.shared.frontmostApplication, app != .current {
+            app.activate()
+        }
+        previousKeyWindow = nil
+    }
 
     private func setHover(_ on: Bool) {
         NSAnimationContext.runAnimationGroup { context in
