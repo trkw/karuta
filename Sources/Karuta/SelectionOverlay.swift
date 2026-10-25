@@ -124,13 +124,26 @@ private final class SelectionView: NSView {
         ))
     }
 
+    /// Like ⌘⇧4 in macOS: crosshair for areas, camera for windows.
+    private var currentCursor: NSCursor {
+        controller.windowMode ? Self.cameraCursor : .crosshair
+    }
+
+    private static let cameraCursor: NSCursor = {
+        let config = NSImage.SymbolConfiguration(pointSize: 20, weight: .regular)
+        guard let image = NSImage(systemSymbolName: "camera.fill", accessibilityDescription: nil)?
+            .withSymbolConfiguration(config)
+        else { return .crosshair }
+        return NSCursor(image: image, hotSpot: NSPoint(x: image.size.width / 2, y: image.size.height / 2))
+    }()
+
     override func resetCursorRects() {
-        addCursorRect(bounds, cursor: .crosshair)
+        addCursorRect(bounds, cursor: currentCursor)
     }
 
     override func mouseEntered(with event: NSEvent) {
         window?.makeKey()
-        NSCursor.crosshair.set()
+        currentCursor.set()
         needsDisplay = true
     }
 
@@ -139,7 +152,7 @@ private final class SelectionView: NSView {
     }
 
     override func mouseMoved(with event: NSEvent) {
-        NSCursor.crosshair.set()
+        currentCursor.set()
         controller.updateHover(at: NSEvent.mouseLocation)
     }
 
@@ -173,7 +186,10 @@ private final class SelectionView: NSView {
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {
         case 53: controller.finish(.cancelled) // Esc
-        case 49 where selection == nil: controller.toggleMode() // Space
+        case 49 where selection == nil: // Space
+            controller.toggleMode()
+            window?.invalidateCursorRects(for: self)
+            currentCursor.set()
         default: super.keyDown(with: event)
         }
     }
