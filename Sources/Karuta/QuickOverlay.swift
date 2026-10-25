@@ -84,10 +84,19 @@ final class QuickOverlay: NSObject {
     }
 
     @objc private func saveImage() {
-        if let shot {
-            do { try Exporter.save(shot) } catch { NSLog("Karuta: save failed: \(error)") }
+        guard let shot else { return }
+        do {
+            try Exporter.save(shot)
+            close()
+        } catch {
+            // Keep the overlay so the capture can still be copied or dragged out.
+            dismissTask?.cancel()
+            let alert = NSAlert(error: error)
+            alert.messageText = "保存できませんでした"
+            NSApp.activate()
+            alert.runModal()
+            scheduleDismiss(after: 6)
         }
-        close()
     }
 
     @objc private func dismiss() {
