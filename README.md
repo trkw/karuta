@@ -37,6 +37,10 @@ make install   # /Applications にコピー
 make install SIGN_IDENTITY="Karuta Dev"
 ```
 
+### アイコン
+
+アプリアイコンの元データは `Support/AppIcon.svg` です。変更したら `make icon`（要 `brew install librsvg`）で `Support/AppIcon.icns` を作り直してコミットしてください。メニューバーのアイコンは `AppDelegate.swift` でコードから描いています。
+
 ## DMG で配布する
 
 最新版のダウンロード: [Karuta.dmg](https://github.com/trkw/karuta/releases/latest/download/Karuta.dmg)（[リリース一覧](https://github.com/trkw/karuta/releases)）

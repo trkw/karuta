@@ -25,7 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setUpStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Karuta")
+        item.button?.image = Self.menuBarImage()
 
         let menu = NSMenu()
         menu.addItem(menuItem("範囲を撮影", #selector(captureArea), key: "4"))
@@ -39,6 +39,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Karuta を終了", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
         statusItem = item
+    }
+
+    /// メニューバー用のテンプレート画像（傾けた札と中央の点）。画像ファイルを持たずにコードで描く
+    private static func menuBarImage() -> NSImage {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
+            let transform = NSAffineTransform()
+            transform.translateX(by: 9, yBy: 9)
+            transform.rotate(byDegrees: 8)
+            transform.concat()
+            NSColor.black.set()
+            let card = NSBezierPath(roundedRect: NSRect(x: -4.5, y: -6, width: 9, height: 12), xRadius: 1.6, yRadius: 1.6)
+            card.lineWidth = 1.5
+            card.stroke()
+            NSBezierPath(ovalIn: NSRect(x: -1.7, y: -1.7, width: 3.4, height: 3.4)).fill()
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "Karuta"
+        return image
     }
 
     private func menuItem(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {

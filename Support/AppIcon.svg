@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<!-- Karuta アプリアイコン。「か」は IPA ゴシックのグリフをパス化したもの。変更したら make icon で AppIcon.icns を作り直す -->
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#2B3A67"/>
+<stop offset="1" stop-color="#151E3B"/>
+</linearGradient>
+<filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+<feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000" flood-opacity=".35"/>
+</filter>
+</defs>
+<path d="M512 100c-210 0-305 0-358 53s-53 148-53 358v2c0 210 0 305 53 358s148 53 358 53 305 0 358-53 53-148 53-358v-2c0-210 0-305-53-358S722 100 512 100z" fill="url(#bg)"/>
+<g transform="rotate(-8 512 520)">
+<g filter="url(#sh)">
+<rect x="317" y="250" width="390" height="540" rx="34" fill="#FBF5E6"/>
+</g>
+<rect x="345" y="278" width="334" height="484" rx="18" fill="none" stroke="#C8372D" stroke-width="14"/>
+<path fill="#1B1B1F" transform="translate(512,520) scale(0.1440922190201729,-0.1440922190201729) translate(-1078,-786)" d="M211 1083Q459 1121 676 1147Q740 1389 766 1591L928 1561Q883 1328 838 1161L870 1163Q926 1165 973 1165Q1303 1165 1303 758Q1303 361 1184 123Q1113 -18 961 -18Q829 -18 676 74L684 248Q842 142 936 142Q1014 142 1055 226Q1141 414 1141 764Q1141 1030 965 1030Q906 1030 799 1022Q764 884 676 655Q523 255 358 -12L217 78Q434 396 596 881Q604 901 637 1001Q510 987 246 934ZM1806 561Q1623 968 1356 1253L1485 1339Q1758 1048 1946 670Z"/>
+</g>
+<path d="M232 288V196H324 M700 196H792V288 M792 764V856H700 M324 856H232V764" fill="none" stroke="#FFFFFF" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
