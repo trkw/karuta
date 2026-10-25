@@ -1,90 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-<!-- Karuta アプリアイコン。変更したら make icon で AppIcon.icns を作り直す -->
+<!-- Karuta アプリアイコン（重ね札）。変更したら make icon で AppIcon.icns を作り直す -->
 <defs>
-<clipPath id="sq">
-<path d="M512 100c-210 0-305 0-358 53s-53 148-53 358v2c0 210 0 305 53 358s148 53 358 53 305 0 358-53 53-148 53-358v-2c0-210 0-305-53-358S722 100 512 100z"/>
-</clipPath>
-<filter id="plate" x="-40%" y="-40%" width="180%" height="190%">
-<feGaussianBlur in="SourceAlpha" stdDeviation="12"/>
-<feOffset dy="10"/>
-<feComponentTransfer>
-<feFuncA type="linear" slope="0.3"/>
-</feComponentTransfer>
-<feMerge>
-<feMergeNode/>
-<feMergeNode in="SourceGraphic"/>
-</feMerge>
-</filter>
-<filter id="lift" x="-40%" y="-40%" width="180%" height="190%">
-<feGaussianBlur in="SourceAlpha" stdDeviation="28"/>
-<feOffset dy="26"/>
-<feComponentTransfer>
-<feFuncA type="linear" slope="0.45"/>
-</feComponentTransfer>
-<feMerge>
-<feMergeNode/>
-<feMergeNode in="SourceGraphic"/>
-</feMerge>
-</filter>
-<filter id="tight" x="-40%" y="-40%" width="180%" height="190%">
-<feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
-<feOffset dy="6"/>
-<feComponentTransfer>
-<feFuncA type="linear" slope="0.3"/>
-</feComponentTransfer>
-<feMerge>
-<feMergeNode/>
-<feMergeNode in="SourceGraphic"/>
-</feMerge>
-</filter>
-<linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
-<stop offset="0" stop-color="#FFFFFF" stop-opacity=".55"/>
-<stop offset=".4" stop-color="#FFFFFF" stop-opacity=".06"/>
-<stop offset="1" stop-color="#000000" stop-opacity=".3"/>
-</linearGradient>
-<linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
-<stop offset="0" stop-color="#FAFBFD"/>
-<stop offset=".5" stop-color="#B9BECB"/>
-<stop offset="1" stop-color="#6E7484"/>
-</linearGradient>
-<linearGradient id="metal2" x1="0" y1="1" x2="0" y2="0">
-<stop offset="0" stop-color="#F2F3F7"/>
-<stop offset="1" stop-color="#5D6271"/>
-</linearGradient>
-<radialGradient id="iris" cx=".5" cy=".5" r=".5">
-<stop offset="0" stop-color="#0A0B1E"/>
-<stop offset=".35" stop-color="#1B1460"/>
-<stop offset=".62" stop-color="#5B3BFF"/>
-<stop offset=".8" stop-color="#22C6FF"/>
-<stop offset=".9" stop-color="#FF5FB0"/>
-<stop offset="1" stop-color="#2A0F4A"/>
-</radialGradient>
-<radialGradient id="dome" cx=".35" cy=".25" r=".8">
-<stop offset="0" stop-color="#FFFFFF" stop-opacity=".55"/>
-<stop offset=".35" stop-color="#FFFFFF" stop-opacity=".05"/>
-<stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
-</radialGradient>
 <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-<stop offset="0" stop-color="#3C4152"/>
-<stop offset="1" stop-color="#101219"/>
+<stop offset="0" stop-color="#2B3A67"/>
+<stop offset="1" stop-color="#151E3B"/>
 </linearGradient>
+<filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+<feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000" flood-opacity=".35"/>
+</filter>
 </defs>
-<g filter="url(#plate)">
 <path d="M512 100c-210 0-305 0-358 53s-53 148-53 358v2c0 210 0 305 53 358s148 53 358 53 305 0 358-53 53-148 53-358v-2c0-210 0-305-53-358S722 100 512 100z" fill="url(#bg)"/>
+<g transform="rotate(10 512 560)">
+<rect x="342" y="300" width="340" height="470" rx="30" fill="#8C97B8" opacity=".55"/>
 </g>
-<path d="M512 100c-210 0-305 0-358 53s-53 148-53 358v2c0 210 0 305 53 358s148 53 358 53 305 0 358-53 53-148 53-358v-2c0-210 0-305-53-358S722 100 512 100z" fill="none" stroke="url(#edge)" stroke-width="5"/>
-<g filter="url(#tight)">
-<path d="M206 316V206H316 M708 206H818V316 M818 708V818H708 M316 818H206V708" fill="none" stroke="#FFFFFF" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+<g transform="rotate(-6 500 500)">
+<g filter="url(#sh)">
+<rect x="322" y="250" width="356" height="490" rx="30" fill="#FBF5E6"/>
 </g>
-<g filter="url(#lift)">
-<circle cx="512" cy="512" r="210" fill="url(#metal)"/>
+<rect x="348" y="276" width="304" height="438" rx="16" fill="none" stroke="#C8372D" stroke-width="12"/>
+<circle cx="500" cy="495" r="62" fill="#C8372D"/>
+<path d="M262 270V190H342 M658 190H738V270 M738 720V800H658 M342 800H262V720" fill="none" stroke="#FFFFFF" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
 </g>
-<circle cx="512" cy="512" r="180.6" fill="url(#metal2)"/>
-<circle cx="512" cy="512" r="163.8" fill="#07080F"/>
-<circle cx="512" cy="512" r="151.2" fill="url(#iris)"/>
-<circle cx="512" cy="512" r="46.2" fill="#03040A"/>
-<circle cx="512" cy="512" r="151.2" fill="url(#dome)"/>
-<ellipse cx="453.2" cy="444.8" rx="42.0" ry="23.1" transform="rotate(-38 453.2 444.8)" fill="#FFFFFF" opacity=".85"/>
-<circle cx="575.0" cy="575.0" r="12.6" fill="#9FF0FF" opacity=".8"/>
-<circle cx="512" cy="512" r="208.5" fill="none" stroke="#FFFFFF" stroke-opacity=".7" stroke-width="3"/>
 </svg>
