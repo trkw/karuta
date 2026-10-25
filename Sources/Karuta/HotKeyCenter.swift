@@ -11,10 +11,12 @@ final class HotKeyCenter {
     private var actions: [UInt32: () -> Void] = [:]
     private var refs: [EventHotKeyRef] = []
     private var eventHandler: EventHandlerRef?
+    private var nextID: UInt32 = 0
 
     func register(keyCode: Int, modifiers: Int, action: @escaping () -> Void) {
         installHandlerIfNeeded()
-        let id = UInt32(actions.count + 1)
+        nextID += 1
+        let id = nextID
         var ref: EventHotKeyRef?
         let status = RegisterEventHotKey(
             UInt32(keyCode), UInt32(modifiers),
@@ -27,6 +29,12 @@ final class HotKeyCenter {
         }
         refs.append(ref)
         actions[id] = action
+    }
+
+    func unregisterAll() {
+        refs.forEach { UnregisterEventHotKey($0) }
+        refs.removeAll()
+        actions.removeAll()
     }
 
     fileprivate func fire(_ id: UInt32) {

@@ -15,6 +15,22 @@ enum Exporter {
         return CGImageDestinationFinalize(destination) ? data as Data : nil
     }
 
+    /// The image in the format chosen in Settings (JPEG at 90% quality).
+    static func fileData(_ shot: Shot, format: Preferences.ImageFormat) -> Data? {
+        guard format == .jpeg else { return pngData(shot) }
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            data as CFMutableData, UTType.jpeg.identifier as CFString, 1, nil
+        ) else { return nil }
+        let dpi = 72 * shot.scale
+        let properties: [CFString: Any] = [
+            kCGImagePropertyDPIWidth: dpi, kCGImagePropertyDPIHeight: dpi,
+            kCGImageDestinationLossyCompressionQuality: 0.9,
+        ]
+        CGImageDestinationAddImage(destination, shot.image, properties as CFDictionary)
+        return CGImageDestinationFinalize(destination) ? data as Data : nil
+    }
+
     static func copy(_ shot: Shot) {
         guard let data = pngData(shot) else { return }
         let pasteboard = NSPasteboard.general
@@ -23,9 +39,10 @@ enum Exporter {
     }
 
     @discardableResult
-    static func save(_ shot: Shot, in directory: URL = desktop) throws -> URL {
-        guard let data = pngData(shot) else { throw CocoaError(.fileWriteUnknown) }
-        let url = uniqueURL(in: directory)
+    static func save(_ shot: Shot, in directory: URL = Preferences.saveDirectory) throws -> URL {
+        let format = Preferences.format
+        guard let data = fileData(shot, format: format) else { throw CocoaError(.fileWriteUnknown) }
+        let url = uniqueURL(in: directory, extension: format.fileExtension)
         try data.write(to: url)
         return url
     }
@@ -37,19 +54,15 @@ enum Exporter {
         return try? save(shot, in: directory)
     }
 
-    private static var desktop: URL {
-        FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask)[0]
-    }
-
-    private static func uniqueURL(in directory: URL) -> URL {
+    private static func uniqueURL(in directory: URL, extension ext: String) -> URL {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
         let base = "Karuta \(formatter.string(from: Date()))"
-        var url = directory.appendingPathComponent("\(base).png")
+        var url = directory.appendingPathComponent("\(base).\(ext)")
         var n = 2
         while FileManager.default.fileExists(atPath: url.path) {
-            url = directory.appendingPathComponent("\(base) (\(n)).png")
+            url = directory.appendingPathComponent("\(base) (\(n)).\(ext)")
             n += 1
         }
         return url

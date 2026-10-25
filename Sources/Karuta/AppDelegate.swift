@@ -1,6 +1,4 @@
 import AppKit
-import Carbon.HIToolbox
-import ServiceManagement
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -17,10 +15,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// for "前回の範囲を撮影".
     private var lastArea: (rect: CGRect, displayID: CGDirectDisplayID)?
     private var isCapturing = false
+    private var settings: SettingsWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setUpStatusItem()
         registerHotKeys()
+        NotificationCenter.default.addObserver(forName: Preferences.didChange, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.registerHotKeys()
+                self?.rebuildMenu()
+            }
+        }
         overlay.onEdit = { [weak self] shot in self?.openEditor(shot) }
         overlay.onPin = { [weak self] shot, frame in self?.pin(shot, near: frame) }
         if !CGPreflightScreenCaptureAccess() {
@@ -34,19 +39,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = Self.menuBarImage()
 
+        statusItem = item
+        rebuildMenu()
+    }
+
+    private func rebuildMenu() {
         let menu = NSMenu()
-        menu.addItem(menuItem("範囲を撮影", #selector(captureArea), key: "4"))
-        menu.addItem(menuItem("ウィンドウを撮影", #selector(captureWindow), key: "5"))
-        menu.addItem(menuItem("全画面を撮影", #selector(captureFullscreen), key: "3"))
-        menu.addItem(menuItem("前回の範囲を撮影", #selector(capturePreviousArea)))
+        let actions: [(ShortcutAction, Selector)] = [
+            (.area, #selector(captureArea)), (.window, #selector(captureWindow)),
+            (.fullscreen, #selector(captureFullscreen)), (.previousArea, #selector(capturePreviousArea)),
+        ]
+        for (action, selector) in actions {
+            let item = NSMenuItem(title: action.title, action: selector, keyEquivalent: "")
+            item.target = self
+            if let key = Preferences.shortcut(for: action)?.menuKeyEquivalent {
+                item.keyEquivalent = key.key
+                item.keyEquivalentModifierMask = key.mask
+            }
+            menu.addItem(item)
+        }
         menu.addItem(.separator())
-        let login = menuItem("ログイン時に起動", #selector(toggleLoginItem(_:)))
-        login.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        menu.addItem(login)
+        let settingsItem = NSMenuItem(title: "設定…", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Karuta を終了", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-        item.menu = menu
-        statusItem = item
+        statusItem?.menu = menu
     }
 
     /// メニューバー用のテンプレート画像（傾けた札と中央の点）。画像ファイルを持たずにコードで描く
@@ -68,20 +86,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return image
     }
 
-    private func menuItem(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
-        item.target = self
-        if !key.isEmpty { item.keyEquivalentModifierMask = [.command, .shift] }
-        return item
-    }
-
-    /// ⌘⇧3 全画面 / ⌘⇧4 範囲 / ⌘⇧5 ウィンドウ（CleanShot と同じ。macOS 標準のスクリーンショットのショートカットはオフにして使う）
+    /// Shortcuts come from Settings (default ⌘⇧3 / ⌘⇧4 / ⌘⇧5 like CleanShot; turn off the macOS ones).
     private func registerHotKeys() {
-        let modifiers = cmdKey | shiftKey
         let hotKeys = HotKeyCenter.shared
-        hotKeys.register(keyCode: kVK_ANSI_3, modifiers: modifiers) { [weak self] in self?.capture(.fullscreen) }
-        hotKeys.register(keyCode: kVK_ANSI_4, modifiers: modifiers) { [weak self] in self?.capture(.area) }
-        hotKeys.register(keyCode: kVK_ANSI_5, modifiers: modifiers) { [weak self] in self?.capture(.window) }
+        hotKeys.unregisterAll()
+        let modes: [ShortcutAction: CaptureMode] = [
+            .area: .area, .window: .window, .fullscreen: .fullscreen, .previousArea: .previousArea,
+        ]
+        for (action, mode) in modes {
+            guard let shortcut = Preferences.shortcut(for: action) else { continue }
+            hotKeys.register(keyCode: Int(shortcut.keyCode), modifiers: Int(shortcut.modifiers)) { [weak self] in
+                self?.capture(mode)
+            }
+        }
     }
 
     // MARK: - Actions
@@ -91,18 +108,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func captureFullscreen() { capture(.fullscreen) }
     @objc private func capturePreviousArea() { capture(.previousArea) }
 
-    @objc private func toggleLoginItem(_ sender: NSMenuItem) {
-        let service = SMAppService.mainApp
-        do {
-            if service.status == .enabled {
-                try service.unregister()
-            } else {
-                try service.register()
+    @objc private func openSettings() {
+        if settings == nil {
+            let controller = SettingsWindowController()
+            controller.onClose = { [weak self] in self?.settings = nil }
+            controller.onRecordingShortcut = { [weak self] recording in
+                // Pause global hot keys so the combination being recorded reaches the field.
+                if recording { HotKeyCenter.shared.unregisterAll() } else { self?.registerHotKeys() }
             }
-        } catch {
-            NSLog("Karuta: login item toggle failed: \(error)")
+            settings = controller
         }
-        sender.state = service.status == .enabled ? .on : .off
+        NSApp.activate()
+        settings?.showWindow(nil)
+        settings?.window?.makeKeyAndOrderFront(nil)
     }
 
     // MARK: - Capture
@@ -138,7 +156,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case .area, .window:
                     let candidates = Capturer.orderedWindows(in: content)
                     // Freeze the screen first, so the selection is made on (and cut from) a still image.
-                    let frozen = await Capturer.freezeDisplays(content: content)
+                    var frozen: [CGDirectDisplayID: Shot] = [:]
+                    if Preferences.freezeScreen { frozen = await Capturer.freezeDisplays(content: content) }
                     let result = await self.selection.run(windowMode: mode == .window, candidates: candidates,
                                                           frozen: frozen)
                     switch result {
@@ -158,13 +177,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         shot = try await Capturer.captureWindow(window)
                     }
                 }
-                self.overlay.show(shot, on: screen)
+                self.deliver(shot, on: screen)
             } catch {
                 NSLog("Karuta: capture failed: \(error)")
                 if !CGPreflightScreenCaptureAccess() { self.showPermissionAlert() }
             }
         }
     }
+
+    /// What happens after a capture, as chosen in Settings.
+    private func deliver(_ shot: Shot, on screen: NSScreen) {
+        if Preferences.playSound { Self.shutterSound?.play() }
+        if Preferences.copyToClipboard { Exporter.copy(shot) }
+        if Preferences.saveToFile {
+            do {
+                try Exporter.save(shot)
+            } catch {
+                NSLog("Karuta: save failed: \(error)")
+            }
+        }
+        if Preferences.showOverlay { overlay.show(shot, on: screen) }
+    }
+
+    private static let shutterSound: NSSound? = {
+        let system = "/System/Library/Components/CoreAudio.component/Contents/SharedSupport/SystemSounds/system/Screen Capture.aif"
+        return NSSound(contentsOfFile: system, byReference: true) ?? NSSound(named: "Tink")
+    }()
 
     private func pin(_ shot: Shot, near frame: NSRect) {
         let window = PinWindow(shot: shot, frame: frame)
