@@ -132,16 +132,22 @@ final class QuickOverlay {
 
     private func layout(animated: Bool) {
         let y = stack().y
-        NSAnimationContext.runAnimationGroup { context in
+        let hidden = isStackHidden
+        if !hidden { cards.forEach { $0.orderFrontRegardless() } }
+        NSAnimationContext.runAnimationGroup({ context in
             context.duration = animated ? 0.25 : 0
             context.allowsImplicitAnimation = true
             for card in cards {
-                let x = isStackHidden ? card.screenFrame.minX - card.frame.width - 20 : card.screenFrame.minX + Self.margin
+                let x = hidden ? card.screenFrame.minX - card.frame.width - 20 : card.screenFrame.minX + Self.margin
                 let origin = NSPoint(x: x, y: y[ObjectIdentifier(card)] ?? 0)
                 card.animator().setFrame(NSRect(origin: origin, size: card.frame.size), display: true)
-                card.animator().alphaValue = 1
+                card.animator().alphaValue = hidden ? 0 : 1
             }
-        }
+        }, completionHandler: { [weak self] in
+            // Off-screen isn't enough: a display to the left would show them. Take them off screen entirely.
+            guard let self, self.isStackHidden else { return }
+            self.cards.forEach { $0.orderOut(nil) }
+        })
     }
 }
 
