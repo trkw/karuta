@@ -219,6 +219,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func openEditor(_ shot: Shot) {
         let editor = EditorWindowController(shot: shot)
+        editor.onDone = { [weak self] edited in self?.overlay.show(edited, on: NSScreen.underMouse) }
+        editor.onPin = { [weak self] edited, frame in self?.pin(edited, near: frame) }
         editor.onClose = { [weak self, weak editor] in
             self?.editors.removeAll { $0 === editor }
         }

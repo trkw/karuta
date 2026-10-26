@@ -1,231 +1,60 @@
 import AppKit
+import UniformTypeIdentifiers
 
-struct Annotation {
-    enum Kind {
-        case arrow(NSPoint, NSPoint)
-        case rect(NSRect)
-        case text(NSPoint, String)
-        case number(NSPoint, Int)
-        case mosaic(NSRect)
-    }
-
-    var kind: Kind
-    var color: NSColor
-}
-
-enum Tool: Int, CaseIterable {
-    case arrow, rect, text, number, mosaic
-
-    var title: String { ["矢印", "四角", "文字", "番号", "モザイク"][rawValue] }
-    /// Single-key shortcut inside the editor.
-    var key: String { ["a", "r", "t", "n", "m"][rawValue] }
-}
-
-/// Draws a shot and its annotations in image point coordinates (bottom-left origin) into the
-/// current NSGraphicsContext. Shared by the on-screen canvas and the export, so both look the same.
+/// CleanShot-style annotation editor: a dark window with the tools in a unified toolbar
+/// (crop and background, then the drawing tools, color, width, Save as… and Done), and a bottom bar
+/// with zoom, a drag handle and share / pin / copy buttons.
 @MainActor
-final class AnnotationRenderer {
-    static let textFont = NSFont.systemFont(ofSize: 22, weight: .bold)
-
-    let shot: Shot
-    let size: NSSize
-    private var pixelated: CGImage?
-
-    init(shot: Shot) {
-        self.shot = shot
-        size = NSSize(width: CGFloat(shot.image.width) / shot.scale, height: CGFloat(shot.image.height) / shot.scale)
-    }
-
-    func draw(_ annotations: [Annotation]) {
-        guard let context = NSGraphicsContext.current?.cgContext else { return }
-        context.interpolationQuality = .high
-        context.draw(shot.image, in: NSRect(origin: .zero, size: size))
-        annotations.forEach { draw($0, in: context) }
-    }
-
-    /// Bakes the annotations into a new image at the original resolution.
-    func render(_ annotations: [Annotation]) -> Shot {
-        guard !annotations.isEmpty else { return shot }
-        let space = shot.image.colorSpace.flatMap { $0.supportsOutput ? $0 : nil }
-            ?? CGColorSpace(name: CGColorSpace.sRGB)!
-        guard let context = CGContext(
-            data: nil, width: shot.image.width, height: shot.image.height, bitsPerComponent: 8, bytesPerRow: 0,
-            space: space,
-            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
-        ) else { return shot }
-        context.scaleBy(x: shot.scale, y: shot.scale)
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
-        draw(annotations)
-        NSGraphicsContext.restoreGraphicsState()
-        return context.makeImage().map { Shot(image: $0, scale: shot.scale) } ?? shot
-    }
-
-    private func draw(_ annotation: Annotation, in context: CGContext) {
-        let color = annotation.color
-        switch annotation.kind {
-        case let .arrow(from, to):
-            drawArrow(from: from, to: to, color: color)
-        case let .rect(rect):
-            color.setStroke()
-            let path = NSBezierPath(roundedRect: rect, xRadius: 4, yRadius: 4)
-            path.lineWidth = 4
-            path.stroke()
-        case let .text(point, string):
-            (string as NSString).draw(at: point, withAttributes: Self.textAttributes(color))
-        case let .number(center, n):
-            let radius: CGFloat = 14
-            color.setFill()
-            NSBezierPath(ovalIn: NSRect(x: center.x - radius, y: center.y - radius,
-                                        width: radius * 2, height: radius * 2)).fill()
-            let label = "\(n)" as NSString
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: 16, weight: .bold),
-                .foregroundColor: color.isLight ? NSColor.black : NSColor.white,
-            ]
-            let size = label.size(withAttributes: attributes)
-            label.draw(at: NSPoint(x: center.x - size.width / 2, y: center.y - size.height / 2),
-                       withAttributes: attributes)
-        case let .mosaic(rect):
-            guard let pixelated = pixelatedImage() else { return }
-            context.saveGState()
-            context.clip(to: rect)
-            context.interpolationQuality = .none
-            context.draw(pixelated, in: NSRect(origin: .zero, size: size))
-            context.restoreGState()
-        }
-    }
-
-    static func textAttributes(_ color: NSColor) -> [NSAttributedString.Key: Any] {
-        [
-            .font: textFont,
-            .foregroundColor: color,
-            .strokeColor: color.isLight ? NSColor.black : NSColor.white,
-            .strokeWidth: -3, // negative: fill and outline
-        ]
-    }
-
-    private func drawArrow(from: NSPoint, to: NSPoint, color: NSColor) {
-        let length = hypot(to.x - from.x, to.y - from.y)
-        guard length > 1 else { return }
-        let angle = atan2(to.y - from.y, to.x - from.x)
-        let head = min(20, length * 0.6)
-        let spread: CGFloat = 0.45
-
-        color.setStroke()
-        let shaft = NSBezierPath()
-        shaft.lineWidth = 4
-        shaft.lineCapStyle = .round
-        shaft.move(to: from)
-        shaft.line(to: NSPoint(x: to.x - cos(angle) * head * 0.7, y: to.y - sin(angle) * head * 0.7))
-        shaft.stroke()
-
-        color.setFill()
-        let tip = NSBezierPath()
-        tip.move(to: to)
-        tip.line(to: NSPoint(x: to.x - head * cos(angle - spread), y: to.y - head * sin(angle - spread)))
-        tip.line(to: NSPoint(x: to.x - head * cos(angle + spread), y: to.y - head * sin(angle + spread)))
-        tip.close()
-        tip.fill()
-    }
-
-    /// The whole image shrunk to 12pt blocks; mosaic regions draw it back without interpolation.
-    /// Built once on first use, so it costs nothing unless the mosaic tool is used.
-    private func pixelatedImage() -> CGImage? {
-        if let pixelated { return pixelated }
-        let block = 12 * shot.scale
-        let width = max(1, Int(CGFloat(shot.image.width) / block))
-        let height = max(1, Int(CGFloat(shot.image.height) / block))
-        guard let context = CGContext(
-            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-            space: CGColorSpace(name: CGColorSpace.sRGB)!,
-            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
-        ) else { return nil }
-        context.interpolationQuality = .medium
-        context.draw(shot.image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        pixelated = context.makeImage()
-        return pixelated
-    }
-}
-
-private extension NSColor {
-    var isLight: Bool {
-        guard let rgb = usingColorSpace(.sRGB) else { return false }
-        return 0.299 * rgb.redComponent + 0.587 * rgb.greenComponent + 0.114 * rgb.blueComponent > 0.7
-    }
-}
-
-// MARK: - Window
-
-@MainActor
-final class EditorWindowController: NSWindowController, NSWindowDelegate {
+final class EditorWindowController: NSWindowController, NSWindowDelegate, NSToolbarDelegate {
     var onClose: (() -> Void)?
+    /// Done: the edited image goes back to Quick Access.
+    var onDone: ((Shot) -> Void)?
+    var onPin: ((Shot, NSRect) -> Void)?
 
     private let canvas: CanvasView
-    private let toolPicker: NSSegmentedControl
-    private static let colors: [(String, NSColor)] = [
-        ("赤", .systemRed), ("黄", .systemYellow), ("緑", .systemGreen),
-        ("青", .systemBlue), ("白", .white), ("黒", .black),
+    private let scrollView = NSScrollView()
+    private var toolButtons: [Tool: ToolButton] = [:]
+    private var backgroundButton: ToolButton?
+    private let zoomPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private static let zoomChoices: [(String, CGFloat?)] = [("フィット", nil), ("50%", 0.5), ("100%", 1), ("200%", 2)]
+
+    private static let colors: [NSColor] = [
+        .systemRed, .systemOrange, .systemYellow, .systemGreen, .systemBlue, .systemPurple, .white, .black,
     ]
 
     init(shot: Shot) {
         let canvas = CanvasView(renderer: AnnotationRenderer(shot: shot))
-        let toolPicker = NSSegmentedControl(labels: Tool.allCases.map(\.title), trackingMode: .selectOne,
-                                            target: nil, action: nil)
         self.canvas = canvas
-        self.toolPicker = toolPicker
 
-        let toolbarHeight: CGFloat = 44
+        let chrome: CGFloat = 52 + 48 // toolbar + bottom bar
         let visible = NSScreen.underMouse.visibleFrame
         let imageSize = canvas.renderer.size
-        let fit = min(1, visible.width * 0.85 / imageSize.width,
-                      (visible.height * 0.85 - toolbarHeight) / imageSize.height)
-        let contentSize = NSSize(width: max(imageSize.width * fit + 32, 560),
-                                 height: max(imageSize.height * fit + 32, 200) + toolbarHeight)
+        let fit = min(1, visible.width * 0.85 / imageSize.width, (visible.height * 0.85 - chrome) / imageSize.height)
+        let contentSize = NSSize(width: max(imageSize.width * fit + 96, 960),
+                                 height: max(imageSize.height * fit + 96, 360) + chrome)
 
         let window = EditorWindow(contentRect: NSRect(origin: .zero, size: contentSize),
-                                  styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                                  styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                                   backing: .buffered, defer: false)
         window.title = "Karuta"
+        window.titleVisibility = .hidden
+        window.appearance = NSAppearance(named: .darkAqua)
         window.isReleasedWhenClosed = false
-        window.contentMinSize = NSSize(width: 560, height: 240)
+        window.contentMinSize = NSSize(width: 820, height: 420)
         super.init(window: window)
         window.delegate = self
-        window.keyHandler = { [weak self] key in self?.handleCommand(key) ?? false }
+        window.keyHandler = { [weak self] key, shift in self?.handleCommand(key, shift: shift) ?? false }
 
-        let content = NSView(frame: NSRect(origin: .zero, size: contentSize))
-        canvas.frame = NSRect(x: 0, y: 0, width: contentSize.width, height: contentSize.height - toolbarHeight)
-        canvas.autoresizingMask = [.width, .height]
-        canvas.onToolChange = { [weak self] tool in self?.toolPicker.selectedSegment = tool.rawValue }
-        content.addSubview(canvas)
+        let toolbar = NSToolbar(identifier: "KarutaEditor")
+        toolbar.delegate = self
+        toolbar.displayMode = .iconOnly
+        toolbar.allowsUserCustomization = false
+        window.toolbar = toolbar
+        window.toolbarStyle = .unified
 
-        toolPicker.target = self
-        toolPicker.action = #selector(toolChanged)
-        toolPicker.selectedSegment = canvas.tool.rawValue
-
-        let colorPicker = NSPopUpButton(frame: .zero, pullsDown: false)
-        for (name, color) in Self.colors {
-            colorPicker.addItem(withTitle: name)
-            colorPicker.lastItem?.image = Self.swatch(color)
-        }
-        colorPicker.target = self
-        colorPicker.action = #selector(colorChanged(_:))
-
-        let spacer = NSView()
-        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let toolbar = NSStackView(views: [
-            toolPicker, colorPicker, spacer,
-            NSButton(title: "取り消し", target: self, action: #selector(undo)),
-            NSButton(title: "コピー", target: self, action: #selector(copyImage)),
-            NSButton(title: "保存", target: self, action: #selector(saveImage)),
-        ])
-        toolbar.spacing = 8
-        toolbar.edgeInsets = NSEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
-        toolbar.frame = NSRect(x: 0, y: contentSize.height - toolbarHeight, width: contentSize.width, height: toolbarHeight)
-        toolbar.autoresizingMask = [.width, .minYMargin]
-        content.addSubview(toolbar)
-
-        window.contentView = content
+        buildContent(size: contentSize)
+        canvas.onStateChange = { [weak self] in self?.syncControls() }
+        syncControls()
         window.center()
         window.makeFirstResponder(canvas)
     }
@@ -237,7 +66,180 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
         onClose?()
     }
 
-    private func handleCommand(_ key: String) -> Bool {
+    func windowDidResize(_ notification: Notification) {
+        canvas.updateFrame()
+    }
+
+    // MARK: - Layout
+
+    private func buildContent(size: NSSize) {
+        let content = NSView(frame: NSRect(origin: .zero, size: size))
+        let bottomBar = makeBottomBar()
+        bottomBar.translatesAutoresizingMaskIntoConstraints = false
+
+        scrollView.drawsBackground = true
+        scrollView.backgroundColor = NSColor(white: 0.13, alpha: 1)
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = true
+        scrollView.autohidesScrollers = true
+        scrollView.documentView = canvas
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+
+        content.addSubview(scrollView)
+        content.addSubview(bottomBar)
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: content.safeAreaLayoutGuide.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: bottomBar.topAnchor),
+            bottomBar.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            bottomBar.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            bottomBar.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            bottomBar.heightAnchor.constraint(equalToConstant: 48),
+        ])
+        window?.contentView = content
+        content.layoutSubtreeIfNeeded()
+        canvas.updateFrame()
+    }
+
+    private func makeBottomBar() -> NSView {
+        let bar = BarView()
+
+        for (title, _) in Self.zoomChoices { zoomPopup.addItem(withTitle: title) }
+        zoomPopup.controlSize = .small
+        zoomPopup.target = self
+        zoomPopup.action = #selector(zoomChanged)
+
+        let handle = DragHandle { [weak self] in
+            guard let self else { return nil }
+            return Exporter.writeTemporary(self.canvas.renderedShot())
+        }
+
+        let share = RoundIconButton(symbol: "square.and.arrow.up", label: "共有") { [weak self] sender in self?.share(from: sender) }
+        let pin = RoundIconButton(symbol: "pin.fill", label: "ピン留め") { [weak self] _ in self?.pinImage() }
+        let copy = RoundIconButton(symbol: "doc.on.doc", label: "コピー (⌘C)") { [weak self] _ in self?.copyImage() }
+        let right = NSStackView(views: [share, pin, copy])
+        right.spacing = 8
+
+        for view in [zoomPopup, handle, right] as [NSView] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            bar.addSubview(view)
+        }
+        NSLayoutConstraint.activate([
+            zoomPopup.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: 14),
+            zoomPopup.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+            handle.centerXAnchor.constraint(equalTo: bar.centerXAnchor),
+            handle.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+            right.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -14),
+            right.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+        ])
+        return bar
+    }
+
+    // MARK: - Toolbar
+
+    private enum Item {
+        static let leading = NSToolbarItem.Identifier("leading")
+        static let tools = NSToolbarItem.Identifier("tools")
+        static let style = NSToolbarItem.Identifier("style")
+        static let width = NSToolbarItem.Identifier("width")
+        static let save = NSToolbarItem.Identifier("save")
+        static let done = NSToolbarItem.Identifier("done")
+    }
+
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [Item.leading, Item.tools, Item.style, Item.width, .flexibleSpace, Item.save, Item.done]
+    }
+
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        toolbarDefaultItemIdentifiers(toolbar)
+    }
+
+    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier,
+                 willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        let item = NSToolbarItem(itemIdentifier: identifier)
+        switch identifier {
+        case Item.leading:
+            let crop = toolButton(.crop)
+            let background = ToolButton(symbol: "photo.artframe", label: "背景 (B)") { [weak self] in
+                self?.canvas.background.toggle()
+            }
+            backgroundButton = background
+            item.view = group([crop, background], separated: true)
+        case Item.tools:
+            let tools = Tool.allCases.filter { $0 != .crop }.map(toolButton)
+            item.view = group(tools, separated: false)
+        case Item.style:
+            item.view = makeColorPopup()
+        case Item.width:
+            let slider = NSSlider(value: Double(canvas.lineWidth), minValue: 1, maxValue: 12,
+                                  target: self, action: #selector(widthChanged(_:)))
+            slider.controlSize = .small
+            slider.toolTip = "太さ"
+            slider.widthAnchor.constraint(equalToConstant: 96).isActive = true
+            item.view = slider
+        case Item.save:
+            let button = NSButton(title: "Save as…", target: self, action: #selector(saveAs))
+            button.bezelStyle = .rounded
+            item.view = button
+        case Item.done:
+            let button = NSButton(title: "Done", target: self, action: #selector(done))
+            button.bezelStyle = .rounded
+            button.keyEquivalent = "\r" // the blue default button
+            item.view = button
+        default:
+            return nil
+        }
+        return item
+    }
+
+    private func toolButton(_ tool: Tool) -> ToolButton {
+        let button = ToolButton(symbol: tool.symbol, label: "\(tool.title) (\(tool.key.uppercased()))") { [weak self] in
+            guard let self else { return }
+            self.canvas.tool = self.canvas.tool == tool && tool == .crop ? .select : tool
+            self.window?.makeFirstResponder(self.canvas)
+        }
+        toolButtons[tool] = button
+        return button
+    }
+
+    /// A rounded capsule holding buttons, like CleanShot's toolbar groups.
+    private func group(_ buttons: [NSView], separated: Bool) -> NSView {
+        let stack = NSStackView(views: buttons)
+        stack.spacing = separated ? 6 : 2
+        stack.edgeInsets = NSEdgeInsets(top: 2, left: 4, bottom: 2, right: 4)
+        let capsule = CapsuleView()
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        capsule.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: capsule.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: capsule.bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: capsule.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: capsule.trailingAnchor),
+        ])
+        return capsule
+    }
+
+    private func makeColorPopup() -> NSView {
+        let popup = NSPopUpButton(frame: .zero, pullsDown: false)
+        for color in Self.colors {
+            popup.addItem(withTitle: "")
+            popup.lastItem?.image = Self.swatch(color)
+        }
+        popup.target = self
+        popup.action = #selector(colorChanged(_:))
+        popup.toolTip = "色"
+        return popup
+    }
+
+    private func syncControls() {
+        for (tool, button) in toolButtons { button.isOn = canvas.tool == tool }
+        backgroundButton?.isOn = canvas.background
+    }
+
+    // MARK: - Commands
+
+    private func handleCommand(_ key: String, shift: Bool) -> Bool {
         if canvas.isEditingText {
             // Without an Edit menu, the text field's standard editing shortcuts need to be sent by hand.
             let actions: [String: Selector] = [
@@ -247,52 +249,94 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
             guard let action = actions[key] else { return false }
             return NSApp.sendAction(action, to: nil, from: self)
         }
-        switch key {
-        case "c": copyImage()
-        case "s": saveImage()
-        case "z": undo()
-        case "w": close()
+        switch (key, shift) {
+        case ("c", false): copyImage()
+        case ("s", false): saveToFolder()
+        case ("s", true): saveAs()
+        case ("z", false): canvas.undo()
+        case ("z", true): canvas.redo()
+        case ("w", _): close()
         default: return false
         }
         return true
     }
 
-    @objc private func toolChanged() {
-        canvas.tool = Tool(rawValue: toolPicker.selectedSegment) ?? .arrow
-        window?.makeFirstResponder(canvas)
-    }
-
     @objc private func colorChanged(_ sender: NSPopUpButton) {
-        canvas.color = Self.colors[sender.indexOfSelectedItem].1
+        canvas.color = Self.colors[sender.indexOfSelectedItem]
         window?.makeFirstResponder(canvas)
     }
 
-    @objc private func undo() {
-        canvas.undo()
+    @objc private func widthChanged(_ sender: NSSlider) {
+        canvas.lineWidth = CGFloat(sender.doubleValue.rounded())
     }
 
-    @objc private func copyImage() {
+    @objc private func zoomChanged() {
+        canvas.zoomLevel = Self.zoomChoices[zoomPopup.indexOfSelectedItem].1
+        window?.makeFirstResponder(canvas)
+    }
+
+    @objc private func done() {
+        onDone?(canvas.renderedShot())
+        close()
+    }
+
+    private func copyImage() {
         Exporter.copy(canvas.renderedShot())
         close()
     }
 
-    @objc private func saveImage() {
+    private func pinImage() {
+        let frame = window?.frame ?? .zero
+        onPin?(canvas.renderedShot(), frame)
+        close()
+    }
+
+    private func saveToFolder() {
         do {
             try Exporter.save(canvas.renderedShot())
             close()
         } catch {
-            let alert = NSAlert(error: error)
-            alert.messageText = "保存できませんでした"
-            if let window { alert.beginSheetModal(for: window) }
+            showError(error)
         }
     }
 
+    @objc private func saveAs() {
+        guard let window else { return }
+        let format = Preferences.format
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [format == .png ? .png : .jpeg]
+        panel.directoryURL = Preferences.saveDirectory
+        panel.nameFieldStringValue = Exporter.defaultFileName(extension: format.fileExtension)
+        let shot = canvas.renderedShot()
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard response == .OK, let url = panel.url else { return }
+            do {
+                guard let data = Exporter.fileData(shot, format: format) else { throw CocoaError(.fileWriteUnknown) }
+                try data.write(to: url)
+                self?.close()
+            } catch {
+                self?.showError(error)
+            }
+        }
+    }
+
+    private func share(from sender: NSView) {
+        guard let url = Exporter.writeTemporary(canvas.renderedShot()) else { return }
+        NSSharingServicePicker(items: [url]).show(relativeTo: sender.bounds, of: sender, preferredEdge: .maxY)
+    }
+
+    private func showError(_ error: Error) {
+        let alert = NSAlert(error: error)
+        alert.messageText = "保存できませんでした"
+        if let window { alert.beginSheetModal(for: window) }
+    }
+
     private static func swatch(_ color: NSColor) -> NSImage {
-        NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
+        NSImage(size: NSSize(width: 14, height: 14), flipped: false) { rect in
             color.setFill()
-            NSBezierPath(ovalIn: rect.insetBy(dx: 0.5, dy: 0.5)).fill()
-            NSColor.separatorColor.setStroke()
-            NSBezierPath(ovalIn: rect.insetBy(dx: 0.5, dy: 0.5)).stroke()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
+            NSColor.white.withAlphaComponent(0.4).setStroke()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).stroke()
             return true
         }
     }
@@ -300,191 +344,182 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
 
 /// The app has no main menu, so ⌘-shortcuts are routed here.
 private final class EditorWindow: NSWindow {
-    var keyHandler: ((String) -> Bool)?
+    var keyHandler: ((String, Bool) -> Bool)?
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if flags.subtracting(.shift) == .command,
            let key = event.charactersIgnoringModifiers?.lowercased(),
-           keyHandler?(key) == true {
+           keyHandler?(key, flags.contains(.shift)) == true {
             return true
         }
         return super.performKeyEquivalent(with: event)
     }
 }
 
-// MARK: - Canvas
+// MARK: - Controls
 
-private final class CanvasView: NSView, NSTextFieldDelegate {
-    let renderer: AnnotationRenderer
-    var tool: Tool = .arrow
-    var color: NSColor = .systemRed
-    var onToolChange: ((Tool) -> Void)?
+/// A toolbar tool: an SF Symbol that turns into white-on-blue when active, like CleanShot.
+final class ToolButton: NSButton {
+    var isOn = false { didSet { needsDisplay = true } }
+    private let symbol: NSImage?
+    private let handler: () -> Void
 
-    private var annotations: [Annotation] = [] { didSet { needsDisplay = true } }
-    private var preview: Annotation? { didSet { needsDisplay = true } }
-    private var dragStart: NSPoint?
-    private var textField: NSTextField?
-    private var textOrigin: NSPoint = .zero
-
-    var isEditingText: Bool { textField != nil }
-
-    init(renderer: AnnotationRenderer) {
-        self.renderer = renderer
+    init(symbol name: String, label: String, handler: @escaping () -> Void) {
+        symbol = NSImage(systemSymbolName: name, accessibilityDescription: label)?
+            .withSymbolConfiguration(.init(pointSize: 13, weight: .medium))
+        self.handler = handler
         super.init(frame: .zero)
+        title = ""
+        isBordered = false
+        toolTip = label
+        setAccessibilityLabel(label)
+        target = self
+        action = #selector(fire)
+        widthAnchor.constraint(equalToConstant: 32).isActive = true
+        heightAnchor.constraint(equalToConstant: 26).isActive = true
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    override var acceptsFirstResponder: Bool { true }
-
-    func undo() {
-        _ = annotations.popLast()
-    }
-
-    func renderedShot() -> Shot {
-        commitText()
-        return renderer.render(annotations)
-    }
-
-    // MARK: Geometry
-
-    /// Where the image sits in the view, scaled to fit (never enlarged).
-    private var imageRect: NSRect {
-        let area = bounds.insetBy(dx: 16, dy: 16)
-        let size = renderer.size
-        let zoom = min(1, area.width / size.width, area.height / size.height)
-        let fitted = NSSize(width: size.width * zoom, height: size.height * zoom)
-        return NSRect(x: bounds.midX - fitted.width / 2, y: bounds.midY - fitted.height / 2,
-                      width: fitted.width, height: fitted.height)
-    }
-
-    private var zoom: CGFloat { imageRect.width / renderer.size.width }
-
-    private func imagePoint(for event: NSEvent) -> NSPoint {
-        let p = convert(event.locationInWindow, from: nil)
-        let rect = imageRect
-        return NSPoint(x: (min(max(p.x, rect.minX), rect.maxX) - rect.minX) / zoom,
-                       y: (min(max(p.y, rect.minY), rect.maxY) - rect.minY) / zoom)
-    }
-
-    private func viewPoint(_ p: NSPoint) -> NSPoint {
-        NSPoint(x: imageRect.minX + p.x * zoom, y: imageRect.minY + p.y * zoom)
-    }
-
-    // MARK: Drawing
+    @objc private func fire() { handler() }
 
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.underPageBackgroundColor.setFill()
+        if isOn {
+            NSColor.controlAccentColor.setFill()
+            NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 6, yRadius: 6).fill()
+        }
+        guard let symbol else { return }
+        let tint: NSColor = isOn ? .white : .labelColor
+        let tinted = NSImage(size: symbol.size, flipped: false) { rect in
+            symbol.draw(in: rect)
+            tint.set()
+            rect.fill(using: .sourceAtop)
+            return true
+        }
+        tinted.draw(in: NSRect(x: (bounds.midX - symbol.size.width / 2).rounded(),
+                               y: (bounds.midY - symbol.size.height / 2).rounded(),
+                               width: symbol.size.width, height: symbol.size.height))
+    }
+}
+
+private final class CapsuleView: NSView {
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.labelColor.withAlphaComponent(0.08).setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: 8, yRadius: 8).fill()
+    }
+}
+
+/// The bottom bar's background with a hairline on top.
+private final class BarView: NSView {
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor(white: 0.18, alpha: 1).setFill()
         bounds.fill()
-        guard let context = NSGraphicsContext.current?.cgContext else { return }
-        let rect = imageRect
-        context.saveGState()
-        context.translateBy(x: rect.minX, y: rect.minY)
-        context.scaleBy(x: zoom, y: zoom)
-        context.clip(to: NSRect(origin: .zero, size: renderer.size))
-        renderer.draw(annotations + (preview.map { [$0] } ?? []))
-        context.restoreGState()
+        NSColor(white: 1, alpha: 0.08).setFill()
+        NSRect(x: 0, y: bounds.maxY - 1, width: bounds.width, height: 1).fill()
+    }
+}
+
+/// A round dark button with a symbol (share, pin, copy).
+private final class RoundIconButton: NSButton {
+    private let symbol: NSImage?
+    private let handler: (NSView) -> Void
+
+    init(symbol name: String, label: String, handler: @escaping (NSView) -> Void) {
+        symbol = NSImage(systemSymbolName: name, accessibilityDescription: label)?
+            .withSymbolConfiguration(.init(pointSize: 12, weight: .semibold))
+        self.handler = handler
+        super.init(frame: .zero)
+        title = ""
+        isBordered = false
+        toolTip = label
+        setAccessibilityLabel(label)
+        target = self
+        action = #selector(fire)
+        widthAnchor.constraint(equalToConstant: 34).isActive = true
+        heightAnchor.constraint(equalToConstant: 28).isActive = true
     }
 
-    override func setFrameSize(_ newSize: NSSize) {
-        commitText()
-        super.setFrameSize(newSize)
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    @objc private func fire() { handler(self) }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor(white: 1, alpha: isHighlighted ? 0.2 : 0.1).setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: bounds.height / 2, yRadius: bounds.height / 2).fill()
+        guard let symbol else { return }
+        let tinted = NSImage(size: symbol.size, flipped: false) { rect in
+            symbol.draw(in: rect)
+            NSColor.white.set()
+            rect.fill(using: .sourceAtop)
+            return true
+        }
+        tinted.draw(in: NSRect(x: (bounds.midX - symbol.size.width / 2).rounded(),
+                               y: (bounds.midY - symbol.size.height / 2).rounded(),
+                               width: symbol.size.width, height: symbol.size.height))
+    }
+}
+
+/// "Drag Me": drag the edited image out as a file.
+private final class DragHandle: NSView, NSDraggingSource {
+    private let makeFile: () -> URL?
+
+    init(makeFile: @escaping () -> URL?) {
+        self.makeFile = makeFile
+        super.init(frame: .zero)
+        toolTip = "ドラッグして他のアプリへ渡す"
+        widthAnchor.constraint(equalToConstant: 150).isActive = true
+        heightAnchor.constraint(equalToConstant: 28).isActive = true
     }
 
-    // MARK: Input
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
 
-    override func mouseDown(with event: NSEvent) {
-        commitText()
-        let p = imagePoint(for: event)
-        switch tool {
-        case .text:
-            beginText(at: p)
-        case .number:
-            let next = annotations.filter { if case .number = $0.kind { true } else { false } }.count + 1
-            annotations.append(Annotation(kind: .number(p, next), color: color))
-        case .arrow, .rect, .mosaic:
-            dragStart = p
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: .openHand)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let shape = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: bounds.height / 2,
+                                 yRadius: bounds.height / 2)
+        NSColor(white: 1, alpha: 0.06).setFill()
+        shape.fill()
+        NSColor(white: 1, alpha: 0.15).setStroke()
+        shape.stroke()
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 12, weight: .medium), .foregroundColor: NSColor.secondaryLabelColor,
+        ]
+        let text = "Drag Me" as NSString
+        let size = text.size(withAttributes: attributes)
+        text.draw(at: NSPoint(x: bounds.midX - size.width / 2, y: bounds.midY - size.height / 2), withAttributes: attributes)
+        // Grip lines on both sides.
+        NSColor.tertiaryLabelColor.setFill()
+        for x in [bounds.minX + 16, bounds.maxX - 26] {
+            for i in 0 ..< 3 {
+                NSRect(x: x, y: bounds.midY - 4 + CGFloat(i) * 4, width: 10, height: 1).fill()
+            }
         }
     }
+
+    override func mouseDown(with event: NSEvent) {}
 
     override func mouseDragged(with event: NSEvent) {
-        guard let start = dragStart else { return }
-        let p = imagePoint(for: event)
-        let rect = NSRect(x: min(start.x, p.x), y: min(start.y, p.y),
-                          width: abs(start.x - p.x), height: abs(start.y - p.y))
-        switch tool {
-        case .arrow: preview = Annotation(kind: .arrow(start, p), color: color)
-        case .rect: preview = Annotation(kind: .rect(rect), color: color)
-        case .mosaic: preview = Annotation(kind: .mosaic(rect), color: color)
-        case .text, .number: break
-        }
+        guard let url = makeFile() else { return }
+        let item = NSDraggingItem(pasteboardWriter: url as NSURL)
+        let icon = NSImage(contentsOf: url) ?? NSImage()
+        let width: CGFloat = 120
+        let height = icon.size.width > 0 ? width * icon.size.height / icon.size.width : width
+        let point = convert(event.locationInWindow, from: nil)
+        item.setDraggingFrame(NSRect(x: point.x - width / 2, y: point.y - height / 2, width: width, height: height),
+                              contents: icon)
+        beginDraggingSession(with: [item], event: event, source: self)
     }
 
-    override func mouseUp(with event: NSEvent) {
-        defer {
-            dragStart = nil
-            preview = nil
-        }
-        guard let preview else { return }
-        switch preview.kind {
-        case let .arrow(a, b) where hypot(b.x - a.x, b.y - a.y) < 4: return
-        case let .rect(r) where r.width < 4 || r.height < 4: return
-        case let .mosaic(r) where r.width < 4 || r.height < 4: return
-        default: annotations.append(preview)
-        }
-    }
-
-    override func keyDown(with event: NSEvent) {
-        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if modifiers.isEmpty, let key = event.charactersIgnoringModifiers?.lowercased(),
-           let tool = Tool.allCases.first(where: { $0.key == key }) {
-            self.tool = tool
-            onToolChange?(tool)
-        } else if event.keyCode == 51 { // Delete
-            undo()
-        } else {
-            super.keyDown(with: event)
-        }
-    }
-
-    // MARK: Text
-
-    private func beginText(at point: NSPoint) {
-        textOrigin = point
-        let font = NSFont.systemFont(ofSize: AnnotationRenderer.textFont.pointSize * zoom, weight: .bold)
-        let field = NSTextField(frame: NSRect(origin: viewPoint(point),
-                                              size: NSSize(width: 240, height: font.boundingRectForFont.height)))
-        field.font = font
-        field.textColor = color
-        field.isBordered = false
-        field.drawsBackground = false
-        field.focusRingType = .none
-        field.placeholderString = "テキスト"
-        field.delegate = self
-        field.target = self
-        field.action = #selector(textCommitted)
-        addSubview(field)
-        window?.makeFirstResponder(field)
-        textField = field
-    }
-
-    @objc private func textCommitted() {
-        commitText()
-        window?.makeFirstResponder(self)
-    }
-
-    func controlTextDidEndEditing(_ obj: Notification) {
-        commitText()
-    }
-
-    private func commitText() {
-        guard let field = textField else { return }
-        textField = nil
-        let string = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        field.removeFromSuperview()
-        if !string.isEmpty {
-            annotations.append(Annotation(kind: .text(textOrigin, string), color: color))
-        }
+    func draggingSession(_ session: NSDraggingSession,
+                         sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+        .copy
     }
 }
