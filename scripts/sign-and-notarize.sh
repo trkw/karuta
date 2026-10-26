@@ -20,6 +20,20 @@ version=${VERSION:-$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionStrin
 app="$root/build/Karuta.app"
 dmg="$root/build/Karuta-$version.dmg"
 
+# stapler が Apple の CloudKit から印を取るとき、通信が切れたり印がまだ配られていなかったりして落ちることがある。数回やり直す
+staple() {
+    local attempt
+    for attempt in 1 2 3 4; do
+        if xcrun stapler staple "$1"; then
+            xcrun stapler validate "$1"
+            return
+        fi
+        [[ $attempt == 4 ]] && return 1
+        echo "== staple をやり直す（$attempt 回目が失敗）"
+        sleep $((attempt * 15))
+    done
+}
+
 summary() {
     echo "$1"
     [[ -z "${GITHUB_STEP_SUMMARY:-}" ]] || echo "$1" >> "$GITHUB_STEP_SUMMARY"
@@ -96,16 +110,14 @@ codesign --verify --deep --strict --verbose=2 "$app"
 
 ditto -c -k --keepParent "$app" "$work/Karuta.zip"
 notarize "$work/Karuta.zip"
-xcrun stapler staple "$app"
-xcrun stapler validate "$app"
+staple "$app"
 
 make dmg-image VERSION="$version"
 
 echo "== 署名 $(basename "$dmg")"
 codesign --force --timestamp --keychain "$keychain" --sign "$identity" "$dmg"
 notarize "$dmg"
-xcrun stapler staple "$dmg"
-xcrun stapler validate "$dmg"
+staple "$dmg"
 
 # dmg に入れた .app の署名が崩れていないか
 mkdir "$work/mount"
