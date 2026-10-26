@@ -165,10 +165,10 @@ final class CanvasView: NSView, NSTextFieldDelegate {
     private var fullRect: NSRect { NSRect(origin: .zero, size: renderer.size) }
     private var editingCrop: Bool { tool == .crop }
     /// The part of the image shown (the crop, unless the crop itself is being edited).
-    private var visibleRect: NSRect { editingCrop ? fullRect : (crop ?? fullRect) }
-    private var padding: CGFloat { background && !editingCrop ? Backdrop.padding(for: visibleRect.size) : 0 }
+    private var shownArea: NSRect { editingCrop ? fullRect : (crop ?? fullRect) }
+    private var padding: CGFloat { background && !editingCrop ? Backdrop.padding(for: shownArea.size) : 0 }
     private var documentSize: NSSize {
-        NSSize(width: visibleRect.width + padding * 2, height: visibleRect.height + padding * 2)
+        NSSize(width: shownArea.width + padding * 2, height: shownArea.height + padding * 2)
     }
 
     private var availableSize: NSSize { enclosingScrollView?.contentSize ?? bounds.size }
@@ -197,8 +197,8 @@ final class CanvasView: NSView, NSTextFieldDelegate {
 
     private func viewPoint(_ p: NSPoint) -> NSPoint {
         let doc = documentRect
-        return NSPoint(x: doc.minX + (padding + p.x - visibleRect.minX) * zoom,
-                       y: doc.minY + (padding + p.y - visibleRect.minY) * zoom)
+        return NSPoint(x: doc.minX + (padding + p.x - shownArea.minX) * zoom,
+                       y: doc.minY + (padding + p.y - shownArea.minY) * zoom)
     }
 
     private func viewRect(_ r: NSRect) -> NSRect {
@@ -209,10 +209,10 @@ final class CanvasView: NSView, NSTextFieldDelegate {
     private func imagePoint(for event: NSEvent, clamp: Bool = true) -> NSPoint {
         let v = convert(event.locationInWindow, from: nil)
         let doc = documentRect
-        var p = NSPoint(x: (v.x - doc.minX) / zoom - padding + visibleRect.minX,
-                        y: (v.y - doc.minY) / zoom - padding + visibleRect.minY)
+        var p = NSPoint(x: (v.x - doc.minX) / zoom - padding + shownArea.minX,
+                        y: (v.y - doc.minY) / zoom - padding + shownArea.minY)
         if clamp {
-            let area = visibleRect
+            let area = shownArea
             p.x = min(max(p.x, area.minX), area.maxX)
             p.y = min(max(p.y, area.minY), area.maxY)
         }
@@ -226,7 +226,7 @@ final class CanvasView: NSView, NSTextFieldDelegate {
         bounds.fill()
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         let doc = documentRect
-        let visible = visibleRect
+        let visible = shownArea
         let marks = annotations + (preview.map { [$0] } ?? [])
 
         context.saveGState()
