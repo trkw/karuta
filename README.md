@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/banner-dark.png">
+  <img src="docs/banner-light.png" alt="Karuta — Lightweight screenshot tool for macOS">
+</picture>
+
 # Karuta
 
 個人用の軽量スクリーンショットアプリ（macOS 14 以上）。CleanShot X を参考に、必要な機能だけを小さく作っています。
