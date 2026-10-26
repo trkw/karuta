@@ -2,7 +2,8 @@ import AppKit
 
 /// CleanShot-style Quick Access Overlay: one card per capture, stacked in the bottom-left corner.
 /// Hovering a card reveals Copy / Save and corner buttons (close, edit, pin); dragging it drops the
-/// file anywhere; a horizontal swipe or the close button dismisses it.
+/// file anywhere; a horizontal swipe or the close button dismisses it. The hide button tucks the whole
+/// stack behind the screen edge, leaving a small tab that brings it back.
 @MainActor
 final class QuickOverlay {
     var onEdit: ((Shot) -> Void)?
@@ -13,6 +14,8 @@ final class QuickOverlay {
     private static let margin: CGFloat = 16
 
     private var cards: [OverlayCard] = []
+    private var isStackHidden = false
+    private var tab: StackTab?
 
     func show(_ shot: Shot, on screen: NSScreen) {
         let card = OverlayCard(shot: shot, screen: screen)
@@ -26,6 +29,8 @@ final class QuickOverlay {
         card.alphaValue = 0
         card.orderFrontRegardless()
         cards.insert(card, at: 0)
+        // A new capture always brings a hidden stack back.
+        if isStackHidden { setStackHidden(false) }
         // Keep at most maxCards, and drop the oldest cards that would stack above the top of the screen.
         while let excess = cards.count > Self.maxCards ? cards.last : stack().overflow {
             remove(excess, animated: true)
@@ -58,7 +63,34 @@ final class QuickOverlay {
             remove(card, animated: true)
         case .swiped:
             remove(card, animated: true, slideOut: true)
+        case .hide:
+            setStackHidden(true)
         }
+    }
+
+    private func setStackHidden(_ hidden: Bool) {
+        isStackHidden = hidden
+        layout(animated: true)
+        updateTab()
+    }
+
+    /// The tab sits on the left edge of the newest card's screen, at the middle of its stack.
+    private func updateTab() {
+        guard isStackHidden, let newest = cards.first else {
+            tab?.orderOut(nil)
+            tab = nil
+            if cards.isEmpty { isStackHidden = false }
+            return
+        }
+        let onScreen = cards.filter { $0.screenFrame == newest.screenFrame }
+        let top = (onScreen.map(\.frame.maxY).max() ?? newest.frame.maxY)
+        let bottom = newest.screenFrame.minY + Self.margin
+        let tab = self.tab ?? StackTab { [weak self] in self?.setStackHidden(false) }
+        let size = tab.frame.size
+        tab.setFrameOrigin(NSPoint(x: newest.screenFrame.minX, y: ((top + bottom) / 2 - size.height / 2).rounded()))
+        tab.setCount(cards.count)
+        tab.orderFrontRegardless()
+        self.tab = tab
     }
 
     private func remove(_ card: OverlayCard, animated: Bool, slideOut: Bool = false) {
@@ -77,6 +109,7 @@ final class QuickOverlay {
             card.orderOut(nil)
         }
         layout(animated: animated)
+        updateTab()
     }
 
     /// The y of each card (newest at the bottom, per screen), and the oldest card on a screen whose stack
@@ -103,7 +136,8 @@ final class QuickOverlay {
             context.duration = animated ? 0.25 : 0
             context.allowsImplicitAnimation = true
             for card in cards {
-                let origin = NSPoint(x: card.screenFrame.minX + Self.margin, y: y[ObjectIdentifier(card)] ?? 0)
+                let x = isStackHidden ? card.screenFrame.minX - card.frame.width - 20 : card.screenFrame.minX + Self.margin
+                let origin = NSPoint(x: x, y: y[ObjectIdentifier(card)] ?? 0)
                 card.animator().setFrame(NSRect(origin: origin, size: card.frame.size), display: true)
                 card.animator().alphaValue = 1
             }
@@ -115,7 +149,7 @@ final class QuickOverlay {
 
 private final class OverlayCard: NSPanel {
     enum Action {
-        case copy, save, edit, pin, close, dropped, swiped
+        case copy, save, edit, pin, close, dropped, swiped, hide
     }
 
     let shot: Shot
@@ -206,13 +240,14 @@ private final class CardView: NSView, NSDraggingSource {
             save.widthAnchor.constraint(equalToConstant: 96),
         ])
 
-        let corners: [(String, String, OverlayCard.Action, NSLayoutConstraint.Attribute, NSLayoutConstraint.Attribute)] = [
-            ("xmark", "閉じる", .close, .left, .top),
-            ("pin.fill", "ピン留め", .pin, .right, .top),
-            ("pencil", "編集", .edit, .left, .bottom),
+        let corners: [(NSImage?, String, OverlayCard.Action, NSLayoutConstraint.Attribute, NSLayoutConstraint.Attribute)] = [
+            (CircleButton.symbol("xmark"), "閉じる", .close, .left, .top),
+            (CircleButton.symbol("pin.fill"), "ピン留め", .pin, .right, .top),
+            (CircleButton.symbol("pencil"), "編集", .edit, .left, .bottom),
+            (Self.hideIcon, "スタックを隠す", .hide, .right, .bottom),
         ]
-        for (symbol, label, action, horizontal, vertical) in corners {
-            let button = CircleButton(symbol: symbol, label: label) { [weak self] in self?.onAction?(action) }
+        for (image, label, action, horizontal, vertical) in corners {
+            let button = CircleButton(image: image, label: label) { [weak self] in self?.onAction?(action) }
             button.translatesAutoresizingMaskIntoConstraints = false
             hoverLayer.addSubview(button)
             NSLayoutConstraint.activate([
@@ -225,6 +260,36 @@ private final class CardView: NSView, NSDraggingSource {
             ])
         }
     }
+
+    /// A rounded square with its lower-left corner folded in: "tuck the stack away".
+    private static let hideIcon: NSImage = {
+        let image = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { _ in
+            let path = NSBezierPath()
+            path.move(to: NSPoint(x: 5, y: 1.5))
+            path.line(to: NSPoint(x: 8.5, y: 1.5))
+            path.appendArc(from: NSPoint(x: 10.5, y: 1.5), to: NSPoint(x: 10.5, y: 3.5), radius: 2)
+            path.line(to: NSPoint(x: 10.5, y: 8.5))
+            path.appendArc(from: NSPoint(x: 10.5, y: 10.5), to: NSPoint(x: 8.5, y: 10.5), radius: 2)
+            path.line(to: NSPoint(x: 3.5, y: 10.5))
+            path.appendArc(from: NSPoint(x: 1.5, y: 10.5), to: NSPoint(x: 1.5, y: 8.5), radius: 2)
+            path.line(to: NSPoint(x: 1.5, y: 5))
+            path.close()
+            path.lineWidth = 1.6
+            path.lineJoinStyle = .round
+            NSColor.black.setStroke()
+            path.stroke()
+            let fold = NSBezierPath()
+            fold.move(to: NSPoint(x: 1.5, y: 5))
+            fold.line(to: NSPoint(x: 5, y: 5))
+            fold.line(to: NSPoint(x: 5, y: 1.5))
+            fold.close()
+            NSColor.black.setFill()
+            fold.fill()
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }()
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
@@ -368,9 +433,13 @@ private final class CircleButton: ClosureButton {
     private static let diameter: CGFloat = 24
     private let symbol: NSImage?
 
-    init(symbol: String, label: String, handler: @escaping () -> Void) {
-        self.symbol = NSImage(systemSymbolName: symbol, accessibilityDescription: label)?
+    static func symbol(_ name: String) -> NSImage? {
+        NSImage(systemSymbolName: name, accessibilityDescription: nil)?
             .withSymbolConfiguration(.init(pointSize: 10, weight: .bold))
+    }
+
+    init(image: NSImage?, label: String, handler: @escaping () -> Void) {
+        symbol = image
         super.init(handler: handler)
         title = ""
         imagePosition = .noImage
@@ -397,5 +466,62 @@ private final class CircleButton: ClosureButton {
         let size = symbol.size
         tinted.draw(in: NSRect(x: (bounds.midX - size.width / 2).rounded(), y: (bounds.midY - size.height / 2).rounded(),
                                width: size.width, height: size.height))
+    }
+}
+
+// MARK: - Hidden stack tab
+
+/// The small handle left on the screen edge while the stack is hidden. Click to bring the cards back.
+private final class StackTab: NSPanel {
+    private let label = NSTextField(labelWithString: "")
+
+    init(onClick: @escaping () -> Void) {
+        let size = NSSize(width: 22, height: 64)
+        super.init(contentRect: NSRect(origin: .zero, size: size),
+                   styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        level = .floating
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = true
+        hidesOnDeactivate = false
+        isReleasedWhenClosed = false
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+
+        let button = TabButton(handler: onClick)
+        button.frame = NSRect(origin: .zero, size: size)
+        button.toolTip = "スタックを表示"
+        contentView = button
+
+        label.font = .systemFont(ofSize: 10, weight: .bold)
+        label.textColor = .white
+        label.alignment = .center
+        label.frame = NSRect(x: 0, y: 8, width: size.width - 2, height: 14)
+        button.addSubview(label)
+    }
+
+    func setCount(_ count: Int) {
+        label.stringValue = "\(count)"
+    }
+}
+
+private final class TabButton: ClosureButton {
+    override func draw(_ dirtyRect: NSRect) {
+        // Rounded on the right only (the left part is clipped by the view): it sticks out of the screen edge.
+        NSColor(white: 0.12, alpha: 0.9).setFill()
+        NSBezierPath(roundedRect: NSRect(x: -12, y: 0, width: bounds.width + 12, height: bounds.height),
+                     xRadius: 10, yRadius: 10).fill()
+        let chevron = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: "スタックを表示")?
+            .withSymbolConfiguration(.init(pointSize: 11, weight: .bold))
+        if let chevron {
+            let tinted = NSImage(size: chevron.size, flipped: false) { rect in
+                chevron.draw(in: rect)
+                NSColor.white.set()
+                rect.fill(using: .sourceAtop)
+                return true
+            }
+            let size = chevron.size
+            tinted.draw(in: NSRect(x: (bounds.midX - size.width / 2).rounded(), y: (bounds.midY + 2).rounded(),
+                                   width: size.width, height: size.height))
+        }
     }
 }
