@@ -317,7 +317,6 @@ final class AnnotationRenderer {
     }
 }
 
-/// CleanShot-style background: the screenshot on a gradient with padding, rounded corners and a shadow.
 /// The backdrop behind a shot (CleanShot's Background tool): a gradient, a plain color, the desktop
 /// wallpaper or a chosen picture, as set in `Preferences`.
 @MainActor
