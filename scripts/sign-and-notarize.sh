@@ -24,8 +24,8 @@ dmg="$root/build/Karuta-$version.dmg"
 staple() {
     local attempt
     for attempt in 1 2 3 4; do
-        if xcrun stapler staple "$1"; then
-            xcrun stapler validate "$1"
+        # validate も同じ CloudKit を引くので、どちらかが落ちたらまとめてやり直す
+        if xcrun stapler staple "$1" && xcrun stapler validate "$1"; then
             return
         fi
         [[ $attempt == 4 ]] && return 1

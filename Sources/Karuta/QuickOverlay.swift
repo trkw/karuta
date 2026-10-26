@@ -6,7 +6,8 @@ import AppKit
 /// stack behind the screen edge, leaving a small tab that brings it back.
 @MainActor
 final class QuickOverlay {
-    var onEdit: ((Shot) -> Void)?
+    /// The shot to edit, and whether it should open with the backdrop on (the card shows it already composed).
+    var onEdit: ((Shot, Bool) -> Void)?
     var onPin: ((Shot, NSRect) -> Void)?
 
     private static let maxCards = 5
@@ -17,8 +18,10 @@ final class QuickOverlay {
     private var isStackHidden = false
     private var tab: StackTab?
 
-    func show(_ shot: Shot, on screen: NSScreen) {
+    /// `original` is the capture before an automatic backdrop was added, so editing can still change it.
+    func show(_ shot: Shot, original: Shot? = nil, on screen: NSScreen) {
         let card = OverlayCard(shot: shot, screen: screen)
+        card.original = original
         card.onAction = { [weak self, weak card] action in
             guard let self, let card else { return }
             self.handle(action, for: card)
@@ -55,7 +58,7 @@ final class QuickOverlay {
             }
         case .edit:
             remove(card, animated: false)
-            onEdit?(card.shot)
+            onEdit?(card.original ?? card.shot, card.original != nil)
         case .pin:
             remove(card, animated: false)
             onPin?(card.shot, card.frame)
@@ -159,6 +162,7 @@ private final class OverlayCard: NSPanel {
     }
 
     let shot: Shot
+    var original: Shot?
     /// The visible frame of the screen the card lives on.
     let screenFrame: NSRect
     var onAction: ((Action) -> Void)?

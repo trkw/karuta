@@ -22,8 +22,9 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSTool
         .systemRed, .systemOrange, .systemYellow, .systemGreen, .systemBlue, .systemPurple, .white, .black,
     ]
 
-    init(shot: Shot) {
+    init(shot: Shot, background: Bool = false) {
         let canvas = CanvasView(renderer: AnnotationRenderer(shot: shot))
+        canvas.background = background
         self.canvas = canvas
 
         let chrome: CGFloat = 52 + 48 // toolbar + bottom bar
@@ -164,6 +165,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSTool
             let background = ToolButton(symbol: "photo.artframe", label: "背景 (B)") { [weak self] in
                 self?.showBackdropPanel()
             }
+            background.isOn = canvas.background
             backgroundButton = background
             item.view = group([crop, background], separated: true)
         case Item.tools:
