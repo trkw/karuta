@@ -380,6 +380,9 @@ enum Backdrop {
             let size = NSSize(width: image.size.width * scale, height: image.size.height * scale)
             let rect = NSRect(x: bounds.midX - size.width / 2, y: bounds.midY - size.height / 2,
                               width: size.width, height: size.height)
+            // A base under see-through pictures, so the export matches the editor's preview.
+            NSColor.white.setFill()
+            bounds.fill()
             NSGraphicsContext.saveGraphicsState()
             NSBezierPath(rect: bounds).addClip()
             image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
