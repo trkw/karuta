@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.statusItem?.isVisible = Preferences.showMenuBarIcon
             }
         }
-        overlay.onEdit = { [weak self] shot in self?.openEditor(shot) }
+        overlay.onEdit = { [weak self] shot, background in self?.openEditor(shot, background: background) }
         overlay.onPin = { [weak self] shot, frame in self?.pin(shot, near: frame) }
         if !CGPreflightScreenCaptureAccess() {
             CGRequestScreenCaptureAccess()
@@ -194,7 +194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSLog("Karuta: save failed: \(error)")
             }
         }
-        if Preferences.showOverlay { overlay.show(shot, on: screen) }
+        if Preferences.showOverlay { overlay.show(shot, original: backdrop ? raw : nil, on: screen) }
         if Preferences.openEditor { openEditor(raw, background: backdrop) }
     }
 
