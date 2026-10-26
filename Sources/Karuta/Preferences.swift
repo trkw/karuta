@@ -70,6 +70,60 @@ enum Preferences {
         set { set(newValue, for: "autoCloseSeconds") }
     }
 
+    // MARK: Editor backdrop
+
+    enum BackdropStyle: String, CaseIterable {
+        case gradient, solid, wallpaper, image
+
+        var title: String {
+            switch self {
+            case .gradient: "グラデーション"
+            case .solid: "単色"
+            case .wallpaper: "壁紙"
+            case .image: "画像"
+            }
+        }
+    }
+
+    static var backdropStyle: BackdropStyle {
+        get { defaults.string(forKey: "backdropStyle").flatMap(BackdropStyle.init(rawValue:)) ?? .gradient }
+        set { set(newValue.rawValue, for: "backdropStyle") }
+    }
+
+    /// Index into `Backdrop.gradients`.
+    static var backdropGradient: Int {
+        get { defaults.integer(forKey: "backdropGradient") }
+        set { set(newValue, for: "backdropGradient") }
+    }
+
+    static var backdropColor: NSColor {
+        get {
+            guard let hex = defaults.string(forKey: "backdropColor"), let value = UInt32(hex, radix: 16) else {
+                return NSColor(srgbRed: 0.95, green: 0.95, blue: 0.97, alpha: 1)
+            }
+            return NSColor(srgbRed: CGFloat(value >> 16 & 0xFF) / 255, green: CGFloat(value >> 8 & 0xFF) / 255,
+                           blue: CGFloat(value & 0xFF) / 255, alpha: 1)
+        }
+        set {
+            let rgb = newValue.usingColorSpace(.sRGB) ?? .white
+            func byte(_ c: CGFloat) -> UInt32 { UInt32((min(max(c, 0), 1) * 255).rounded()) }
+            let value = byte(rgb.redComponent) << 16 | byte(rgb.greenComponent) << 8 | byte(rgb.blueComponent)
+            set(String(value, radix: 16), for: "backdropColor")
+        }
+    }
+
+    /// A picture chosen for the `.image` style.
+    static var backdropImagePath: String? {
+        get { defaults.string(forKey: "backdropImagePath") }
+        set { set(newValue ?? "", for: "backdropImagePath") }
+    }
+
+    /// Space around the shot, as a percentage of its shorter side.
+    static var backdropPadding: Int {
+        get { defaults.object(forKey: "backdropPadding") == nil ? 8 : defaults.integer(forKey: "backdropPadding") }
+        set { set(newValue, for: "backdropPadding") }
+    }
+
     static var format: ImageFormat {
         get { defaults.string(forKey: "format").flatMap(ImageFormat.init(rawValue:)) ?? .png }
         set { set(newValue.rawValue, for: "format") }
