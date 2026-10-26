@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Secrets を入れ直したときなどに、Actions の画面から署名・公証を確かめられるように
+  workflow_dispatch:
 
 jobs:
   build:
