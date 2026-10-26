@@ -162,7 +162,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSTool
         case Item.leading:
             let crop = toolButton(.crop)
             let background = ToolButton(symbol: "photo.artframe", label: "背景 (B)") { [weak self] in
-                self?.canvas.background.toggle()
+                self?.showBackdropPanel()
             }
             backgroundButton = background
             item.view = group([crop, background], separated: true)
@@ -230,6 +230,16 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSTool
         popup.action = #selector(colorChanged(_:))
         popup.toolTip = "色"
         return popup
+    }
+
+    /// Turns the backdrop on and opens its options (gradient, color, wallpaper, picture, padding).
+    private func showBackdropPanel() {
+        guard let button = backgroundButton else { return }
+        if !canvas.background { canvas.background = true }
+        let popover = NSPopover()
+        popover.behavior = .semitransient
+        popover.contentViewController = BackdropPanel(canvas: canvas)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
     }
 
     private func syncControls() {
@@ -327,7 +337,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSTool
 
     private func share(from sender: NSView) {
         guard let url = Exporter.writeTemporary(canvas.renderedShot()) else { return }
-        NSSharingServicePicker(items: [url]).show(relativeTo: sender.bounds, of: sender, preferredEdge: .maxY)
+        NSSharingServicePicker(items: [url]).show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
     }
 
     private func showError(_ error: Error) {

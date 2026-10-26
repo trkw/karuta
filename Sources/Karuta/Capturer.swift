@@ -99,6 +99,8 @@ enum Capturer {
         config.width = Int((filter.contentRect.width * scale).rounded())
         config.height = Int((filter.contentRect.height * scale).rounded())
         config.showsCursor = false
+        // The default background is opaque black, which fills in the window's rounded corners.
+        config.backgroundColor = .clear
         let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
         return Shot(image: image, scale: scale)
     }

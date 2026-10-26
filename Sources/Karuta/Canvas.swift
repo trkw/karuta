@@ -113,6 +113,15 @@ final class CanvasView: NSView, NSTextFieldDelegate {
     init(renderer: AnnotationRenderer) {
         self.renderer = renderer
         super.init(frame: .zero)
+        NotificationCenter.default.addObserver(self, selector: #selector(preferencesChanged),
+                                               name: Preferences.didChange, object: nil)
+    }
+
+    /// The backdrop's style and padding live in Preferences.
+    @objc private func preferencesChanged() {
+        guard background else { return }
+        updateFrame()
+        needsDisplay = true
     }
 
     @available(*, unavailable)
