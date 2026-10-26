@@ -337,8 +337,19 @@ private struct PageBuilder {
             guard let control = sender as? NSSegmentedControl else { return }
             Preferences.format = control.selectedSegment == 0 ? .png : .jpeg
         }.attach(to: format)
+        let backdrop = NSPopUpButton(frame: .zero, pullsDown: false)
+        backdrop.addItems(withTitles: Preferences.AutoBackdrop.allCases.map(\.title))
+        backdrop.selectItem(at: Preferences.AutoBackdrop.allCases.firstIndex(of: Preferences.autoBackdrop) ?? 0)
+        ClosureTarget { sender in
+            guard let popup = sender as? NSPopUpButton else { return }
+            Preferences.autoBackdrop = Preferences.AutoBackdrop.allCases[popup.indexOfSelectedItem]
+        }.attach(to: backdrop)
         return [
             section("ファイル", rows: [row("形式", control: format)]),
+            section("背景", rows: [
+                row("撮影後に背景を付ける", control: backdrop),
+                noteRow("背景の種類と余白は、注釈エディタの背景ボタンで選んだものを使います。"),
+            ]),
             section("範囲選択", rows: [
                 switchRow("画面を止めて選ぶ", Preferences.freezeScreen,
                           note: "動画やメニューが動いていても、選び始めた瞬間の画面を撮ります。") { Preferences.freezeScreen = $0 },

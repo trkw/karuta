@@ -118,6 +118,25 @@ enum Preferences {
         set { set(newValue ?? "", for: "backdropImagePath") }
     }
 
+    /// Which shots get the backdrop right after capture (copy, save and thumbnail use the result;
+    /// the editor opens with the background turned on, so it can still be changed there).
+    enum AutoBackdrop: String, CaseIterable {
+        case off, windows, all
+
+        var title: String {
+            switch self {
+            case .off: "付けない"
+            case .windows: "ウィンドウ撮影だけ"
+            case .all: "すべての撮影"
+            }
+        }
+    }
+
+    static var autoBackdrop: AutoBackdrop {
+        get { defaults.string(forKey: "autoBackdrop").flatMap(AutoBackdrop.init(rawValue:)) ?? .off }
+        set { set(newValue.rawValue, for: "autoBackdrop") }
+    }
+
     /// Space around the shot, as a percentage of its shorter side.
     static var backdropPadding: Int {
         get { defaults.object(forKey: "backdropPadding") == nil ? 8 : defaults.integer(forKey: "backdropPadding") }

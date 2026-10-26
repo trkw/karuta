@@ -123,6 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let content = try await Capturer.shareableContent()
                 let shot: Shot
                 let screen: NSScreen
+                var isWindow = false
                 switch mode {
                 case .fullscreen:
                     screen = NSScreen.underMouse
@@ -164,9 +165,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     case let .window(window):
                         screen = NSScreen.underMouse
                         shot = try await Capturer.captureWindow(window)
+                        isWindow = true
                     }
                 }
-                self.deliver(shot, on: screen)
+                self.deliver(shot, on: screen, isWindow: isWindow)
             } catch {
                 NSLog("Karuta: capture failed: \(error)")
                 if !CGPreflightScreenCaptureAccess() { self.showPermissionAlert() }
@@ -175,8 +177,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// What happens after a capture, as chosen in Settings.
-    private func deliver(_ shot: Shot, on screen: NSScreen) {
+    private func deliver(_ raw: Shot, on screen: NSScreen, isWindow: Bool) {
         if Preferences.playSound { Sounds.shutter()?.play() }
+        let backdrop = switch Preferences.autoBackdrop {
+        case .off: false
+        case .windows: isWindow
+        case .all: true
+        }
+        // The editor gets the plain shot with the background switched on, so the backdrop stays adjustable.
+        let shot = backdrop ? Backdrop.compose(raw) : raw
         if Preferences.copyToClipboard { Exporter.copy(shot) }
         if Preferences.saveToFile {
             do {
@@ -186,7 +195,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         if Preferences.showOverlay { overlay.show(shot, on: screen) }
-        if Preferences.openEditor { openEditor(shot) }
+        if Preferences.openEditor { openEditor(raw, background: backdrop) }
     }
 
     private func pin(_ shot: Shot, near frame: NSRect) {
@@ -198,8 +207,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.orderFrontRegardless()
     }
 
-    private func openEditor(_ shot: Shot) {
-        let editor = EditorWindowController(shot: shot)
+    private func openEditor(_ shot: Shot, background: Bool = false) {
+        let editor = EditorWindowController(shot: shot, background: background)
         editor.onDone = { [weak self] edited in self?.overlay.show(edited, on: NSScreen.underMouse) }
         editor.onPin = { [weak self] edited, frame in self?.pin(edited, near: frame) }
         editor.onClose = { [weak self, weak editor] in
