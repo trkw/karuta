@@ -58,7 +58,17 @@ struct Annotation {
         switch kind {
         case let .line(a, b), let .arrow(a, b):
             return Self.distance(from: point, toSegment: a, b) <= width / 2 + tolerance
-        case let .rect(r), let .ellipse(r):
+        case let .ellipse(r):
+            // Picked by the curved outline: inside the outer ring, outside the inner one.
+            func inside(_ inset: CGFloat) -> Bool {
+                let rx = r.width / 2 - inset, ry = r.height / 2 - inset
+                guard rx > 0, ry > 0 else { return false }
+                let dx = (point.x - r.midX) / rx, dy = (point.y - r.midY) / ry
+                return dx * dx + dy * dy <= 1
+            }
+            let slack = width / 2 + tolerance
+            return inside(-slack) && !inside(slack)
+        case let .rect(r):
             // Outlines are picked by their edge, so marks inside them stay reachable.
             let outer = r.insetBy(dx: -width / 2 - tolerance, dy: -width / 2 - tolerance)
             let inner = r.insetBy(dx: width / 2 + tolerance, dy: width / 2 + tolerance)
@@ -127,11 +137,18 @@ final class AnnotationRenderer {
             if case let .spotlight(r) = annotation.kind { return r } else { return nil }
         }
         if !spotlights.isEmpty {
-            let dim = NSBezierPath(rect: NSRect(origin: .zero, size: size))
-            spotlights.forEach { dim.append(NSBezierPath(roundedRect: $0, xRadius: 6, yRadius: 6)) }
-            dim.windingRule = .evenOdd
-            NSColor.black.withAlphaComponent(0.55).setFill()
-            dim.fill()
+            // Dim in a layer and clear each spot, so overlapping spots stay bright.
+            context.saveGState()
+            context.beginTransparencyLayer(auxiliaryInfo: nil)
+            context.setFillColor(NSColor.black.withAlphaComponent(0.55).cgColor)
+            context.fill(NSRect(origin: .zero, size: size))
+            context.setBlendMode(.clear)
+            for spot in spotlights {
+                context.addPath(CGPath(roundedRect: spot, cornerWidth: 6, cornerHeight: 6, transform: nil))
+            }
+            context.fillPath()
+            context.endTransparencyLayer()
+            context.restoreGState()
         }
         for annotation in annotations where !annotation.isImageEffect {
             draw(annotation, in: context)

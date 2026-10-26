@@ -276,6 +276,11 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSTool
     }
 
     @objc private func done() {
+        // Return while cropping applies the crop instead of finishing.
+        if canvas.tool == .crop, NSApp.currentEvent?.type == .keyDown {
+            canvas.tool = .select
+            return
+        }
         onDone?(canvas.renderedShot())
         close()
     }
