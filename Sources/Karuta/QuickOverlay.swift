@@ -178,7 +178,33 @@ private final class OverlayCard: NSPanel {
         let view = CardView(frame: NSRect(origin: .zero, size: size), image: shot.image)
         view.onAction = { [weak self] action in self?.onAction?(action) }
         view.makeFile = { [weak self] in self.flatMap { Exporter.writeTemporary($0.shot) } }
+        view.onHover = { [weak self] hovering in
+            if hovering { self?.stopAutoClose() } else { self?.startAutoClose() }
+        }
         contentView = view
+        startAutoClose()
+    }
+
+    private var autoCloseTimer: Timer?
+
+    /// Closes the card after the delay chosen in Settings; hovering pauses it.
+    private func startAutoClose() {
+        stopAutoClose()
+        let seconds = Preferences.autoCloseSeconds
+        guard seconds > 0 else { return }
+        autoCloseTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(seconds), repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.onAction?(.close) }
+        }
+    }
+
+    private func stopAutoClose() {
+        autoCloseTimer?.invalidate()
+        autoCloseTimer = nil
+    }
+
+    override func orderOut(_ sender: Any?) {
+        stopAutoClose()
+        super.orderOut(sender)
     }
 
     /// Becomes key while hovered (without activating the app) so ⌘C / ⌘S / ⌘W / ⌘E work, like CleanShot.
@@ -188,6 +214,7 @@ private final class OverlayCard: NSPanel {
 private final class CardView: NSView, NSDraggingSource {
     var onAction: ((OverlayCard.Action) -> Void)?
     var makeFile: (() -> URL?)?
+    var onHover: ((Bool) -> Void)?
 
     private let image: CGImage
     private let hoverLayer = NSView()
@@ -307,6 +334,7 @@ private final class CardView: NSView, NSDraggingSource {
 
     override func mouseEntered(with event: NSEvent) {
         setHover(true)
+        onHover?(true)
         if let key = NSApp.keyWindow, key !== window { previousKeyWindow = key }
         window?.makeKey()
         window?.makeFirstResponder(self)
@@ -314,6 +342,7 @@ private final class CardView: NSView, NSDraggingSource {
 
     override func mouseExited(with event: NSEvent) {
         setHover(false)
+        onHover?(false)
         restoreKeyboardFocus()
     }
 

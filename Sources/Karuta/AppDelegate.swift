@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated {
                 self?.registerHotKeys()
                 self?.rebuildMenu()
+                self?.statusItem?.isVisible = Preferences.showMenuBarIcon
             }
         }
         overlay.onEdit = { [weak self] shot in self?.openEditor(shot) }
@@ -33,6 +34,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Opening Karuta again (e.g. from Finder) shows Settings: the way back when the menu bar icon is hidden.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        openSettings()
+        return false
+    }
+
     // MARK: - Setup
 
     private func setUpStatusItem() {
@@ -40,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item.button?.image = Self.menuBarImage()
 
         statusItem = item
+        item.isVisible = Preferences.showMenuBarIcon
         rebuildMenu()
     }
 
@@ -187,7 +195,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// What happens after a capture, as chosen in Settings.
     private func deliver(_ shot: Shot, on screen: NSScreen) {
-        if Preferences.playSound { Self.shutterSound?.play() }
+        if Preferences.playSound { Sounds.shutter()?.play() }
         if Preferences.copyToClipboard { Exporter.copy(shot) }
         if Preferences.saveToFile {
             do {
@@ -197,12 +205,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         if Preferences.showOverlay { overlay.show(shot, on: screen) }
+        if Preferences.openEditor { openEditor(shot) }
     }
-
-    private static let shutterSound: NSSound? = {
-        let system = "/System/Library/Components/CoreAudio.component/Contents/SharedSupport/SystemSounds/system/Screen Capture.aif"
-        return NSSound(contentsOfFile: system, byReference: true) ?? NSSound(named: "Tink")
-    }()
 
     private func pin(_ shot: Shot, near frame: NSRect) {
         let window = PinWindow(shot: shot, frame: frame)

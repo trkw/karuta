@@ -23,9 +23,7 @@ enum Capturer {
               let display = content.displays.first(where: { $0.displayID == id })
         else { throw CaptureError.displayNotFound }
 
-        let pid = ProcessInfo.processInfo.processIdentifier
-        let ownApps = content.applications.filter { $0.processID == pid }
-        let filter = SCContentFilter(display: display, excludingApplications: ownApps, exceptingWindows: [])
+        let filter = filter(for: display, content: content)
         let scale = screen.backingScaleFactor
 
         let config = SCStreamConfiguration()
@@ -77,6 +75,21 @@ enum Capturer {
         ) else { return Shot(image: cropped, scale: scale) }
         context.draw(cropped, in: CGRect(x: 0, y: 0, width: cropped.width, height: cropped.height))
         return context.makeImage().map { Shot(image: $0, scale: scale) }
+    }
+
+    /// Everything on the display except Karuta itself, and (if chosen in Settings) Finder's desktop icons.
+    private static func filter(for display: SCDisplay, content: SCShareableContent) -> SCContentFilter {
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let ownApps = content.applications.filter { $0.processID == pid }
+        guard Preferences.hideDesktopIcons else {
+            return SCContentFilter(display: display, excludingApplications: ownApps, exceptingWindows: [])
+        }
+        let iconLevel = Int(CGWindowLevelForKey(.desktopIconWindow))
+        let iconWindows = content.windows.filter {
+            $0.owningApplication?.bundleIdentifier == "com.apple.finder" && $0.windowLayer == iconLevel
+        }
+        let ownWindows = content.windows.filter { $0.owningApplication?.processID == pid }
+        return SCContentFilter(display: display, excludingWindows: ownWindows + iconWindows)
     }
 
     static func captureWindow(_ window: SCWindow) async throws -> Shot {

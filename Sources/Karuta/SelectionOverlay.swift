@@ -391,7 +391,7 @@ private final class SelectionView: NSView {
 
     /// A pixel magnifier with the cursor's coordinates, placed below-right of the cursor (flipped near edges).
     private func drawLoupe(at point: NSPoint) {
-        guard let frozen, let context = NSGraphicsContext.current?.cgContext else { return }
+        guard Preferences.showLoupe, let frozen, let context = NSGraphicsContext.current?.cgContext else { return }
         let cells = Self.loupeCells
         let side = CGFloat(cells) * Self.loupeCellSize
         let coordinates = "\(Int(point.x)), \(Int(bounds.height - point.y))" as NSString

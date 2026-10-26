@@ -37,6 +37,39 @@ enum Preferences {
         set { set(newValue, for: "playSound") }
     }
 
+    static var openEditor: Bool {
+        get { bool("openEditor", default: false) }
+        set { set(newValue, for: "openEditor") }
+    }
+
+    static var showMenuBarIcon: Bool {
+        get { bool("showMenuBarIcon", default: true) }
+        set { set(newValue, for: "showMenuBarIcon") }
+    }
+
+    /// Leaves Finder's desktop icons out of captures (the wallpaper stays).
+    static var hideDesktopIcons: Bool {
+        get { bool("hideDesktopIcons", default: false) }
+        set { set(newValue, for: "hideDesktopIcons") }
+    }
+
+    static var showLoupe: Bool {
+        get { bool("showLoupe", default: true) }
+        set { set(newValue, for: "showLoupe") }
+    }
+
+    /// Empty means the system screenshot sound; otherwise the name of a system sound such as "Pop".
+    static var shutterSound: String {
+        get { defaults.string(forKey: "shutterSound") ?? "" }
+        set { set(newValue, for: "shutterSound") }
+    }
+
+    /// Seconds before a Quick Access card closes by itself; 0 keeps it.
+    static var autoCloseSeconds: Int {
+        get { defaults.integer(forKey: "autoCloseSeconds") }
+        set { set(newValue, for: "autoCloseSeconds") }
+    }
+
     static var format: ImageFormat {
         get { defaults.string(forKey: "format").flatMap(ImageFormat.init(rawValue:)) ?? .png }
         set { set(newValue.rawValue, for: "format") }
