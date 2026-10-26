@@ -37,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setUpStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = Self.menuBarImage()
+        item.button?.image = NSImage(systemSymbolName: "rectangle.dashed", accessibilityDescription: "Karuta")
 
         statusItem = item
         rebuildMenu()
@@ -65,25 +65,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Karuta を終了", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem?.menu = menu
-    }
-
-    /// メニューバー用のテンプレート画像（傾けた札と中央の点）。画像ファイルを持たずにコードで描く
-    private static func menuBarImage() -> NSImage {
-        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
-            let transform = NSAffineTransform()
-            transform.translateX(by: 9, yBy: 9)
-            transform.rotate(byDegrees: 8)
-            transform.concat()
-            NSColor.black.set()
-            let card = NSBezierPath(roundedRect: NSRect(x: -4.5, y: -6, width: 9, height: 12), xRadius: 1.6, yRadius: 1.6)
-            card.lineWidth = 1.5
-            card.stroke()
-            NSBezierPath(ovalIn: NSRect(x: -1.7, y: -1.7, width: 3.4, height: 3.4)).fill()
-            return true
-        }
-        image.isTemplate = true
-        image.accessibilityDescription = "Karuta"
-        return image
     }
 
     /// Shortcuts come from Settings (default ⌘⇧3 / ⌘⇧4 / ⌘⇧5 like CleanShot; turn off the macOS ones).

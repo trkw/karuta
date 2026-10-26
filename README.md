@@ -79,7 +79,7 @@ make install SIGN_IDENTITY="Karuta Dev"
 
 ### アイコン
 
-アプリアイコンの元データは `Support/AppIcon.svg` です。変更したら `make icon`（要 `brew install librsvg`、あると小さくなる `pngquant`）で `Support/AppIcon.icns` を作り直してコミットしてください。メニューバーのアイコンは `AppDelegate.swift` でコードから描いています。
+アプリアイコンの元データは `Support/AppIcon.svg` です。変更したら `make icon`（要 `brew install librsvg`、あると小さくなる `pngquant`）で `Support/AppIcon.icns` を作り直してコミットしてください。メニューバーのアイコンは SF Symbols の `rectangle.dashed` です。
 
 ## DMG で配布する
 

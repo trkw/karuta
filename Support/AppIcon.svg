@@ -1,24 +1,89 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-<!-- Karuta アプリアイコン（重ね札）。変更したら make icon で AppIcon.icns を作り直す -->
+<!-- Karuta アプリアイコン。変更したら make icon で AppIcon.icns を作り直す -->
 <defs>
-<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-<stop offset="0" stop-color="#2B3A67"/>
-<stop offset="1" stop-color="#151E3B"/>
-</linearGradient>
-<filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
-<feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000" flood-opacity=".35"/>
+<clipPath id="sq">
+<path d="M512 100c-210 0-305 0-358 53s-53 148-53 358v2c0 210 0 305 53 358s148 53 358 53 305 0 358-53 53-148 53-358v-2c0-210 0-305-53-358S722 100 512 100z"/>
+</clipPath>
+<filter id="plate" x="-40%" y="-40%" width="180%" height="190%">
+<feGaussianBlur in="SourceAlpha" stdDeviation="10"/>
+<feOffset dy="8"/>
+<feComponentTransfer>
+<feFuncA type="linear" slope="0.28"/>
+</feComponentTransfer>
+<feMerge>
+<feMergeNode/>
+<feMergeNode in="SourceGraphic"/>
+</feMerge>
 </filter>
+<filter id="lift" x="-40%" y="-40%" width="180%" height="190%">
+<feGaussianBlur in="SourceAlpha" stdDeviation="20"/>
+<feOffset dy="18"/>
+<feComponentTransfer>
+<feFuncA type="linear" slope="0.35"/>
+</feComponentTransfer>
+<feMerge>
+<feMergeNode/>
+<feMergeNode in="SourceGraphic"/>
+</feMerge>
+</filter>
+<filter id="tight" x="-40%" y="-40%" width="180%" height="190%">
+<feGaussianBlur in="SourceAlpha" stdDeviation="5"/>
+<feOffset dy="5"/>
+<feComponentTransfer>
+<feFuncA type="linear" slope="0.28"/>
+</feComponentTransfer>
+<feMerge>
+<feMergeNode/>
+<feMergeNode in="SourceGraphic"/>
+</feMerge>
+</filter>
+<linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#FFFFFF" stop-opacity=".5"/>
+<stop offset=".3" stop-color="#FFFFFF" stop-opacity="0"/>
+<stop offset="1" stop-color="#000" stop-opacity=".18"/>
+</linearGradient>
+<linearGradient id="wht" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#FFFFFF"/>
+<stop offset="1" stop-color="#E3E8F0"/>
+</linearGradient>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#FFFFFF"/>
+<stop offset="1" stop-color="#E6EAF1"/>
+</linearGradient>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#7CC8FF"/>
+<stop offset="1" stop-color="#BDE5FF"/>
+</linearGradient>
+<linearGradient id="hill1" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#4CD964"/>
+<stop offset="1" stop-color="#1FA34A"/>
+</linearGradient>
+<linearGradient id="hill2" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#34C759"/>
+<stop offset="1" stop-color="#138A3B"/>
+</linearGradient>
 </defs>
+<g filter="url(#plate)">
 <path d="M512 100c-210 0-305 0-358 53s-53 148-53 358v2c0 210 0 305 53 358s148 53 358 53 305 0 358-53 53-148 53-358v-2c0-210 0-305-53-358S722 100 512 100z" fill="url(#bg)"/>
-<g transform="rotate(10 512 560)">
-<rect x="342" y="300" width="340" height="470" rx="30" fill="#8C97B8" opacity=".55"/>
 </g>
-<g transform="rotate(-6 500 500)">
-<g filter="url(#sh)">
-<rect x="322" y="250" width="356" height="490" rx="30" fill="#FBF5E6"/>
+<path d="M512 100c-210 0-305 0-358 53s-53 148-53 358v2c0 210 0 305 53 358s148 53 358 53 305 0 358-53 53-148 53-358v-2c0-210 0-305-53-358S722 100 512 100z" fill="none" stroke="url(#edge)" stroke-width="4"/>
+<g filter="url(#tight)">
+<clipPath id="pic">
+<rect x="262" y="300" width="500" height="424" rx="10"/>
+</clipPath>
+<g clip-path="url(#pic)">
+<rect x="262" y="300" width="500" height="424" fill="url(#sky)"/>
+<circle cx="660" cy="390" r="46" fill="#FFD43B"/>
+<path d="M262 640 Q400 520 540 610 T762 580 V724 H262Z" fill="url(#hill1)"/>
+<path d="M262 700 Q470 600 762 690 V724 H262Z" fill="url(#hill2)"/>
 </g>
-<rect x="348" y="276" width="304" height="438" rx="16" fill="none" stroke="#C8372D" stroke-width="12"/>
-<circle cx="500" cy="495" r="62" fill="#C8372D"/>
-<path d="M262 270V190H342 M658 190H738V270 M738 720V800H658 M342 800H262V720" fill="none" stroke="#FFFFFF" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<rect x="262" y="300" width="500" height="424" fill="none" stroke="#1673FF" stroke-width="10" stroke-dasharray="30 18"/>
+<circle cx="262" cy="300" r="22" fill="#FFFFFF" stroke="#1673FF" stroke-width="10"/>
+<circle cx="762" cy="300" r="22" fill="#FFFFFF" stroke="#1673FF" stroke-width="10"/>
+<circle cx="262" cy="724" r="22" fill="#FFFFFF" stroke="#1673FF" stroke-width="10"/>
+<circle cx="762" cy="724" r="22" fill="#FFFFFF" stroke="#1673FF" stroke-width="10"/>
+<g filter="url(#tight)" stroke-linecap="round">
+<path d="M512 210V270M512 754V814M172 512H232M792 512H852" stroke="#1673FF" stroke-width="16"/>
 </g>
 </svg>
