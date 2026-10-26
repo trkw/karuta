@@ -120,3 +120,7 @@ GitHub Actions の Secrets に Developer ID の証明書と App Store Connect AP
 
 - 「システム設定」>「プライバシーとセキュリティ」に出る「このまま開く」を押す
 - ターミナルで `xattr -dr com.apple.quarantine /Applications/Karuta.app` を実行する
+
+## ライセンス
+
+[MIT](LICENSE)
