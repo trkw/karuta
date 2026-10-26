@@ -7,7 +7,7 @@ SIGN_IDENTITY ?= -
 VERSION ?= $(shell /usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" Support/Info.plist)
 DMG := $(BUILD_DIR)/$(APP_NAME)-$(VERSION).dmg
 
-.PHONY: app dmg icon run install clean
+.PHONY: app dmg dmg-image icon run install clean
 
 app:
 	swift build -c release -Xswiftc -Osize
@@ -23,6 +23,10 @@ app:
 	@du -sh "$(APP)"
 
 dmg: app
+	$(MAKE) dmg-image VERSION="$(VERSION)" SIGN_IDENTITY="$(SIGN_IDENTITY)"
+
+# 組み立て済みの $(APP) をそのまま dmg にする（scripts/sign-and-notarize.sh が署名・公証したあとに使う）
+dmg-image:
 	rm -rf "$(BUILD_DIR)/dmg" "$(DMG)"
 	mkdir -p "$(BUILD_DIR)/dmg"
 	cp -R "$(APP)" "$(BUILD_DIR)/dmg/"

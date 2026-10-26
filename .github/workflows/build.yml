@@ -10,8 +10,15 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      # 鍵が登録されていれば Developer ID で署名・公証する。無ければ（fork からの PR など）ad-hoc 署名のまま（docs/signing.md）
       - name: Build DMG
-        run: make dmg
+        env:
+          APPLE_DEVELOPER_ID_P12: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
+          APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: scripts/sign-and-notarize.sh
       - uses: actions/upload-artifact@v4
         with:
           name: Karuta

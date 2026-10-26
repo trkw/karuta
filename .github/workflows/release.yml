@@ -36,11 +36,21 @@ jobs:
             echo "v$version は既にリリース済みです"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
+      # 鍵が登録されていれば Developer ID で署名・公証する（docs/signing.md）
       - name: Build DMG
+        id: build
         if: steps.version.outputs.skip != 'true'
-        run: make dmg VERSION="$VERSION"
+        env:
+          APPLE_DEVELOPER_ID_P12: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
+          APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: scripts/sign-and-notarize.sh
       - name: Publish release
         if: steps.version.outputs.skip != 'true'
+        env:
+          NOTARIZED: ${{ steps.build.outputs.notarized }}
         run: |
           # バージョンなしの Karuta.dmg も添付し、releases/latest/download/Karuta.dmg で常に最新版を落とせるようにする
           cp "build/Karuta-$VERSION.dmg" build/Karuta.dmg
@@ -51,7 +61,9 @@ jobs:
           - [Karuta-$VERSION.dmg]($base/download/v$VERSION/Karuta-$VERSION.dmg)
           - 常に最新版: [Karuta.dmg]($base/latest/download/Karuta.dmg)
 
-          公証していないため、初回は「システム設定」>「プライバシーとセキュリティ」の「このまま開く」で起動してください。
           EOF
+          if [ "$NOTARIZED" != "true" ]; then
+            echo "公証していないため、初回は「システム設定」>「プライバシーとセキュリティ」の「このまま開く」で起動してください。" >> build/notes.md
+          fi
           gh release create "v$VERSION" "build/Karuta-$VERSION.dmg" build/Karuta.dmg \
             --target "$GITHUB_SHA" --title "Karuta $VERSION" --notes-file build/notes.md --generate-notes
