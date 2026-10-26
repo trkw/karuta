@@ -54,11 +54,20 @@ enum Exporter {
         return try? save(shot, in: directory)
     }
 
-    private static func uniqueURL(in directory: URL, extension ext: String) -> URL {
+    /// "Karuta yyyy-MM-dd HH.mm.ss.png"
+    static func defaultFileName(extension ext: String) -> String {
+        "\(baseName()).\(ext)"
+    }
+
+    private static func baseName() -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
-        let base = "Karuta \(formatter.string(from: Date()))"
+        return "Karuta \(formatter.string(from: Date()))"
+    }
+
+    private static func uniqueURL(in directory: URL, extension ext: String) -> URL {
+        let base = baseName()
         var url = directory.appendingPathComponent("\(base).\(ext)")
         var n = 2
         while FileManager.default.fileExists(atPath: url.path) {
