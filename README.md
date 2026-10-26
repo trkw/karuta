@@ -107,11 +107,11 @@ make dmg   # build/Karuta-<バージョン>.dmg を作成
 
 PR や main への push でも DMG がビルドされ、Actions の実行結果からダウンロードできます（7 日間保存）。
 
-### DMG から入れるとき
+### 署名と公証
 
-Apple の公証を受けていないため、ダウンロードした DMG のアプリは初回起動時に Gatekeeper にブロックされます。Applications にコピーしたあと、次のどちらかで開いてください。
+GitHub Actions の Secrets に Developer ID の証明書と App Store Connect API の鍵が登録されていれば、CI が Karuta.app と DMG を Developer ID で署名し、Apple の公証を受けて印を留めます（`scripts/sign-and-notarize.sh`）。ダウンロードした DMG をそのまま開いても警告は出ず、署名が変わらないので更新しても画面収録の許可が維持されます。鍵の作り方と登録は [docs/signing.md](docs/signing.md) を見てください。
+
+鍵が登録されていなければ、これまでどおりアドホック署名の DMG を作ります。その場合は初回起動時に Gatekeeper にブロックされるので、Applications にコピーしたあと次のどちらかで開いてください。
 
 - 「システム設定」>「プライバシーとセキュリティ」に出る「このまま開く」を押す
 - ターミナルで `xattr -dr com.apple.quarantine /Applications/Karuta.app` を実行する
-
-警告なしで配布するには、Apple Developer Program（年 99 USD）の Developer ID 署名と公証が必要です。
