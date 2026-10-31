@@ -3,7 +3,12 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     enum CaptureMode {
-        case area, window, fullscreen, previousArea
+        case area, window, fullscreen, previousArea, selfTimer
+    }
+
+    /// What to do with a shot: the After Capture settings, or one fixed action ("範囲を撮影してコピー" etc.).
+    enum Delivery {
+        case settings, copy, save, annotate, pin
     }
 
     private var statusItem: NSStatusItem?
@@ -53,20 +58,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func rebuildMenu() {
         let menu = NSMenu()
-        let actions: [(ShortcutAction, Selector)] = [
-            (.area, #selector(captureArea)), (.window, #selector(captureWindow)),
-            (.fullscreen, #selector(captureFullscreen)), (.previousArea, #selector(capturePreviousArea)),
+        let groups: [[ShortcutAction]] = [
+            [.area, .window, .fullscreen, .previousArea, .selfTimer],
+            [.openClipboard, .openFile, .pinFile, .restoreClosed],
         ]
-        for (action, selector) in actions {
-            let item = NSMenuItem(title: action.title, action: selector, keyEquivalent: "")
-            item.target = self
-            if let key = Preferences.shortcut(for: action)?.menuKeyEquivalent {
-                item.keyEquivalent = key.key
-                item.keyEquivalentModifierMask = key.mask
+        for group in groups {
+            for action in group {
+                let item = MenuAction(title: action.title) { [weak self] in self?.perform(action) }
+                if let key = Preferences.shortcut(for: action)?.menuKeyEquivalent {
+                    item.keyEquivalent = key.key
+                    item.keyEquivalentModifierMask = key.mask
+                }
+                menu.addItem(item)
             }
-            menu.addItem(item)
+            menu.addItem(.separator())
         }
-        menu.addItem(.separator())
         let settingsItem = NSMenuItem(title: "設定…", action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
@@ -79,23 +85,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func registerHotKeys() {
         let hotKeys = HotKeyCenter.shared
         hotKeys.unregisterAll()
-        let modes: [ShortcutAction: CaptureMode] = [
-            .area: .area, .window: .window, .fullscreen: .fullscreen, .previousArea: .previousArea,
-        ]
-        for (action, mode) in modes {
+        for action in ShortcutAction.allCases {
             guard let shortcut = Preferences.shortcut(for: action) else { continue }
             hotKeys.register(keyCode: Int(shortcut.keyCode), modifiers: Int(shortcut.modifiers)) { [weak self] in
-                self?.capture(mode)
+                self?.perform(action)
             }
         }
     }
 
     // MARK: - Actions
 
-    @objc private func captureArea() { capture(.area) }
-    @objc private func captureWindow() { capture(.window) }
-    @objc private func captureFullscreen() { capture(.fullscreen) }
-    @objc private func capturePreviousArea() { capture(.previousArea) }
+    private func perform(_ action: ShortcutAction) {
+        switch action {
+        case .area: capture(.area)
+        case .window: capture(.window)
+        case .fullscreen: capture(.fullscreen)
+        case .previousArea: capture(.previousArea)
+        case .selfTimer: capture(.selfTimer)
+        case .areaCopy: capture(.area, delivery: .copy)
+        case .areaSave: capture(.area, delivery: .save)
+        case .areaAnnotate: capture(.area, delivery: .annotate)
+        case .areaPin: capture(.area, delivery: .pin)
+        case .openClipboard:
+            guard let shot = ImageLoader.shotFromPasteboard() else {
+                NSSound.beep()
+                return
+            }
+            openEditor(shot)
+        case .openFile:
+            if let shot = ImageLoader.chooseImage(prompt: "編集") { openEditor(shot) }
+        case .pinFile:
+            // Centred on the screen under the mouse.
+            if let shot = ImageLoader.chooseImage(prompt: "ピン留め") { pin(shot, near: NSScreen.underMouse.visibleFrame) }
+        case .restoreClosed:
+            if !overlay.restoreClosed(on: NSScreen.underMouse) { NSSound.beep() }
+        case .toggleOverlays: overlay.toggleHidden()
+        case .saveAllOverlays: overlay.saveAll()
+        case .closeAllOverlays: overlay.closeAll()
+        }
+    }
 
     @objc private func openSettings() {
         if settings == nil {
@@ -114,7 +142,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Capture
 
-    private func capture(_ mode: CaptureMode) {
+    private func capture(_ mode: CaptureMode, delivery: Delivery = .settings) {
         guard !isCapturing else { return }
         isCapturing = true
         Task {
@@ -123,10 +151,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let content = try await Capturer.shareableContent()
                 let shot: Shot
                 let screen: NSScreen
+                let frame: NSRect // where the shot was on screen (AppKit global), for pinning it in place
+                var delivery = delivery
                 var isWindow = false
                 switch mode {
                 case .fullscreen:
                     screen = NSScreen.underMouse
+                    frame = screen.frame
                     shot = try await Capturer.captureDisplay(of: screen, rect: nil, content: content)
                 case .previousArea:
                     guard let last = self.lastArea,
@@ -142,33 +173,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         return
                     }
                     screen = lastScreen
+                    frame = rect
                     shot = try await Capturer.captureDisplay(of: screen, rect: rect, content: content)
-                case .area, .window:
+                case .area, .window, .selfTimer:
+                    let timed = mode == .selfTimer
                     let candidates = Capturer.orderedWindows(in: content)
                     // Freeze the screen first, so the selection is made on (and cut from) a still image.
+                    // The self-timer captures the live screen after the countdown, so it never freezes.
                     var frozen: [CGDirectDisplayID: Shot] = [:]
-                    if Preferences.freezeScreen { frozen = await Capturer.freezeDisplays(content: content) }
+                    if Preferences.freezeScreen && !timed { frozen = await Capturer.freezeDisplays(content: content) }
                     let result = await self.selection.run(windowMode: mode == .window, candidates: candidates,
                                                           frozen: frozen)
+                    // Holding ⌃ while finishing the selection copies instead (CleanShot does the same).
+                    if delivery == .settings && NSEvent.modifierFlags.contains(.control) { delivery = .copy }
                     switch result {
                     case .cancelled:
                         return
                     case let .area(rect, selectedScreen):
                         screen = selectedScreen
+                        frame = rect
                         let id = screen.displayID
                         if let id { self.lastArea = (rect.offsetBy(dx: -screen.frame.minX, dy: -screen.frame.minY), id) }
-                        if let full = id.flatMap({ frozen[$0] }), let cropped = Capturer.crop(full, to: rect, on: screen) {
+                        if timed {
+                            guard await SelfTimer.countdown(Preferences.selfTimerSeconds, over: rect) else { return }
+                            // The screen has changed during the countdown (that's the point), so ask again.
+                            let fresh = try await Capturer.shareableContent()
+                            shot = try await Capturer.captureDisplay(of: screen, rect: rect, content: fresh)
+                        } else if let full = id.flatMap({ frozen[$0] }),
+                                  let cropped = Capturer.crop(full, to: rect, on: screen) {
                             shot = cropped
                         } else {
                             shot = try await Capturer.captureDisplay(of: screen, rect: rect, content: content)
                         }
                     case let .window(window):
                         screen = NSScreen.underMouse
+                        frame = Geometry.appKitRect(fromCG: window.frame)
+                        if timed {
+                            guard await SelfTimer.countdown(Preferences.selfTimerSeconds, over: frame) else { return }
+                        }
                         shot = try await Capturer.captureWindow(window)
                         isWindow = true
                     }
                 }
-                self.deliver(shot, on: screen, isWindow: isWindow)
+                self.deliver(shot, on: screen, frame: frame, isWindow: isWindow, delivery: delivery)
             } catch {
                 NSLog("Karuta: capture failed: \(error)")
                 if !CGPreflightScreenCaptureAccess() { self.showPermissionAlert() }
@@ -177,7 +224,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// What happens after a capture, as chosen in Settings.
-    private func deliver(_ raw: Shot, on screen: NSScreen, isWindow: Bool) {
+    private func deliver(_ raw: Shot, on screen: NSScreen, frame: NSRect, isWindow: Bool, delivery: Delivery) {
         if Preferences.playSound { Sounds.shutter()?.play() }
         let backdrop = switch Preferences.autoBackdrop {
         case .off: false
@@ -186,6 +233,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // The editor gets the plain shot with the background switched on, so the backdrop stays adjustable.
         let shot = backdrop ? Backdrop.compose(raw) : raw
+        switch delivery {
+        case .settings:
+            break
+        case .copy:
+            Exporter.copy(shot)
+            return
+        case .save:
+            do {
+                try Exporter.save(shot)
+            } catch {
+                NSLog("Karuta: save failed: \(error)")
+                NSSound.beep()
+            }
+            return
+        case .annotate:
+            openEditor(raw, background: backdrop)
+            return
+        case .pin:
+            pin(shot, near: frame)
+            return
+        }
         if Preferences.copyToClipboard { Exporter.copy(shot) }
         if Preferences.saveToFile {
             do {

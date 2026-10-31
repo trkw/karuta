@@ -47,6 +47,26 @@ enum Exporter {
         return url
     }
 
+    /// Asks where to save (starting in the save folder). Returns whether it was saved.
+    @MainActor
+    static func saveAs(_ shot: Shot) -> Bool {
+        let format = Preferences.format
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [format == .png ? .png : .jpeg]
+        panel.directoryURL = Preferences.saveDirectory
+        panel.nameFieldStringValue = defaultFileName(extension: format.fileExtension)
+        NSApp.activate()
+        guard panel.runModal() == .OK, let url = panel.url else { return false }
+        do {
+            guard let data = fileData(shot, format: format) else { throw CocoaError(.fileWriteUnknown) }
+            try data.write(to: url)
+            return true
+        } catch {
+            NSAlert(error: error).runModal()
+            return false
+        }
+    }
+
     /// Writes into a temp folder for drag & drop out of the quick overlay.
     static func writeTemporary(_ shot: Shot) -> URL? {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("Karuta", isDirectory: true)
