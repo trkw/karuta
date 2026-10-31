@@ -323,8 +323,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSTool
         let panel = NSSavePanel()
         panel.allowedContentTypes = [format.utType]
         panel.directoryURL = Preferences.saveDirectory
-        panel.nameFieldStringValue = Exporter.defaultFileName(extension: format.fileExtension)
         let shot = canvas.renderedShot()
+        panel.nameFieldStringValue = Exporter.defaultFileName(extension: format.fileExtension, app: shot.app)
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             do {

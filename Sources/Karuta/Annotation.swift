@@ -165,12 +165,12 @@ final class AnnotationRenderer {
             NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
             draw(annotations)
             NSGraphicsContext.restoreGraphicsState()
-            if let image = context.makeImage() { result = Shot(image: image, scale: shot.scale) }
+            if let image = context.makeImage() { result = Shot(image: image, scale: shot.scale, app: shot.app) }
         }
         if let crop {
             let pixels = CGRect(x: crop.minX * shot.scale, y: (size.height - crop.maxY) * shot.scale,
                                 width: crop.width * shot.scale, height: crop.height * shot.scale).integral
-            if let cropped = result.image.cropping(to: pixels) { result = Shot(image: cropped, scale: shot.scale) }
+            if let cropped = result.image.cropping(to: pixels) { result = Shot(image: cropped, scale: shot.scale, app: shot.app) }
         }
         return result
     }
@@ -425,7 +425,7 @@ enum Backdrop {
         let rect = NSRect(x: pad, y: pad, width: size.width, height: size.height)
         drawCard(rect) { context.draw(shot.image, in: rect) }
         NSGraphicsContext.restoreGraphicsState()
-        return context.makeImage().map { Shot(image: $0, scale: shot.scale) } ?? shot
+        return context.makeImage().map { Shot(image: $0, scale: shot.scale, app: shot.app) } ?? shot
     }
 }
 

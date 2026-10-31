@@ -38,7 +38,7 @@ enum Exporter {
         ) else { return shot }
         context.interpolationQuality = .high
         context.draw(shot.image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        return context.makeImage().map { Shot(image: $0, scale: 1) } ?? shot
+        return context.makeImage().map { Shot(image: $0, scale: 1, app: shot.app) } ?? shot
     }
 
     static func copy(_ shot: Shot) {
@@ -52,7 +52,7 @@ enum Exporter {
     static func save(_ shot: Shot, in directory: URL = Preferences.saveDirectory) throws -> URL {
         let format = Preferences.format
         guard let data = fileData(shot, format: format) else { throw CocoaError(.fileWriteUnknown) }
-        let url = uniqueURL(in: directory, extension: format.fileExtension)
+        let url = uniqueURL(in: directory, extension: format.fileExtension, app: shot.app)
         try data.write(to: url)
         return url
     }
@@ -64,7 +64,7 @@ enum Exporter {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [format.utType]
         panel.directoryURL = Preferences.saveDirectory
-        panel.nameFieldStringValue = defaultFileName(extension: format.fileExtension)
+        panel.nameFieldStringValue = defaultFileName(extension: format.fileExtension, app: shot.app)
         NSApp.activate()
         guard panel.runModal() == .OK, let url = panel.url else { return false }
         do {
@@ -85,11 +85,12 @@ enum Exporter {
     }
 
     /// From the template in Settings, e.g. "Karuta 2026-10-31 13.05.09.png".
-    static func defaultFileName(extension ext: String) -> String {
-        "\(baseName()).\(ext)"
+    static func defaultFileName(extension ext: String, app: String?) -> String {
+        "\(baseName(app: app)).\(ext)"
     }
 
-    private static func baseName() -> String {
+    /// `app` is the one that was in front at capture time (empty when unknown, e.g. a file or the clipboard).
+    private static func baseName(app: String?) -> String {
         let now = Date()
         func formatted(_ format: String) -> String {
             let formatter = DateFormatter()
@@ -97,11 +98,10 @@ enum Exporter {
             formatter.dateFormat = format
             return formatter.string(from: now)
         }
-        let app = NSWorkspace.shared.frontmostApplication.flatMap { $0 == .current ? nil : $0.localizedName } ?? ""
         let name = Preferences.fileNameTemplate
             .replacingOccurrences(of: "{date}", with: formatted("yyyy-MM-dd"))
             .replacingOccurrences(of: "{time}", with: formatted("HH.mm.ss"))
-            .replacingOccurrences(of: "{app}", with: app)
+            .replacingOccurrences(of: "{app}", with: app ?? "")
             // "/" and ":" can't be in a file name; collapse the spaces an empty {app} leaves.
             .replacingOccurrences(of: "/", with: "-")
             .replacingOccurrences(of: ":", with: ".")
@@ -109,8 +109,8 @@ enum Exporter {
         return name.isEmpty ? "Karuta" : name
     }
 
-    private static func uniqueURL(in directory: URL, extension ext: String) -> URL {
-        let base = baseName()
+    private static func uniqueURL(in directory: URL, extension ext: String, app: String?) -> URL {
+        let base = baseName(app: app)
         var url = directory.appendingPathComponent("\(base).\(ext)")
         var n = 2
         while FileManager.default.fileExists(atPath: url.path) {

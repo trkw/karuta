@@ -1,10 +1,12 @@
 import AppKit
 @preconcurrency import ScreenCaptureKit
 
-/// A captured image plus the backing scale it was taken at (used for DPI metadata).
+/// A captured image plus the backing scale it was taken at (used for DPI metadata), and the app that was
+/// in front when it was taken (for the {app} file name token).
 struct Shot {
     let image: CGImage
     let scale: CGFloat
+    var app: String? = nil
 }
 
 enum CaptureError: Error {
