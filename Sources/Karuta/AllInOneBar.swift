@@ -3,7 +3,8 @@ import AppKit
 /// The bar under an All-In-One area: its size (type to change), an aspect-ratio lock, and the ways to finish
 /// (self-timer, pin, annotate, save, copy, capture). Lives inside the selection overlay, so it's never captured.
 final class AllInOneBar: NSView {
-    var onSize: ((NSSize) -> Void)?
+    /// The typed size, and whether it was the width field (else the height) that was edited.
+    var onSize: ((NSSize, Bool) -> Void)?
     var onAspect: ((CGFloat?) -> Void)?
     var onAction: ((SelectionController.Action) -> Void)?
 
@@ -27,7 +28,7 @@ final class AllInOneBar: NSView {
 
         for field in [widthField, heightField] {
             field.target = self
-            field.action = #selector(sizeEdited)
+            field.action = #selector(sizeEdited(_:))
         }
         let times = NSTextField(labelWithString: "×")
         times.textColor = .secondaryLabelColor
@@ -88,9 +89,9 @@ final class AllInOneBar: NSView {
     // Clicks on the bar's background shouldn't fall through and start a new area.
     override func mouseDown(with event: NSEvent) {}
 
-    @objc private func sizeEdited() {
+    @objc private func sizeEdited(_ sender: NSTextField) {
         let width = max(widthField.integerValue, 4), height = max(heightField.integerValue, 4)
-        onSize?(NSSize(width: width, height: height))
+        onSize?(NSSize(width: width, height: height), sender === widthField)
     }
 
     @objc private func aspectChosen() {

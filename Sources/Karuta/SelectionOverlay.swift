@@ -179,12 +179,15 @@ private final class SelectionView: NSView {
 
     private var isDragging: Bool { anchor != nil }
 
+    /// The All-In-One aspect lock; the other modes never use it.
+    private var activeAspect: CGFloat? { controller.allInOne ? controller.lockedAspect : nil }
+
     /// The selection as shaped by Shift (square) and Option (from center), before clipping to the screen.
     private var rawSelection: NSRect? {
         guard let anchor, let current else { return nil }
         var dx = current.x - anchor.x
         var dy = current.y - anchor.y
-        if let ratio = modifiers.contains(.shift) ? 1 : controller.lockedAspect {
+        if let ratio = modifiers.contains(.shift) ? 1 : activeAspect {
             // Grow the shorter side to the ratio (Shift is 1:1).
             var width = abs(dx), height = abs(dy)
             if width / max(height, 1) > ratio { height = width / ratio } else { width = height * ratio }
@@ -419,8 +422,17 @@ private final class SelectionView: NSView {
 
     /// Shows `rect` as the adjustable area with its bar.
     func adjust(to rect: NSRect) {
-        var rect = rect.intersection(bounds)
-        guard !rect.isNull else { return }
+        var rect = rect
+        if activeAspect != nil || (adjusting != nil && modifiers.contains(.shift)) {
+            // Keep the shape: shrink both sides to fit the screen, then slide it back on.
+            let scale = min(1, bounds.width / max(rect.width, 1), bounds.height / max(rect.height, 1))
+            rect.size = NSSize(width: rect.width * scale, height: rect.height * scale)
+            rect.origin.x = min(max(rect.minX, bounds.minX), bounds.maxX - rect.width)
+            rect.origin.y = min(max(rect.minY, bounds.minY), bounds.maxY - rect.height)
+        } else {
+            rect = rect.intersection(bounds)
+            guard !rect.isNull else { return }
+        }
         rect = NSRect(x: rect.minX.rounded(), y: rect.minY.rounded(),
                       width: max(rect.width.rounded(), 4), height: max(rect.height.rounded(), 4))
         adjusted = rect
@@ -440,8 +452,13 @@ private final class SelectionView: NSView {
 
     private func makeBar() -> AllInOneBar {
         let bar = AllInOneBar()
-        bar.onSize = { [weak self] size in
+        bar.onSize = { [weak self] size, widthEdited in
             guard let self, let adjusted = self.adjusted else { return }
+            var size = size
+            // With a lock, the side that was typed in leads and the other follows.
+            if let ratio = self.activeAspect {
+                if widthEdited { size.height = (size.width / ratio).rounded() } else { size.width = (size.height * ratio).rounded() }
+            }
             // Keep the top-left corner where it is.
             self.adjust(to: NSRect(x: adjusted.minX, y: adjusted.maxY - size.height, width: size.width, height: size.height))
             self.window?.makeFirstResponder(self)
@@ -508,7 +525,7 @@ private final class SelectionView: NSView {
         if handle.right { maxX = max(maxX + dx, minX + 4) }
         if handle.bottom { minY = min(minY + dy, maxY - 4) }
         if handle.top { maxY = max(maxY + dy, minY + 4) }
-        if let ratio = modifiers.contains(.shift) ? 1 : controller.lockedAspect {
+        if let ratio = modifiers.contains(.shift) ? 1 : activeAspect {
             let width = maxX - minX, height = maxY - minY
             if handle.isCorner || handle.left || handle.right {
                 // The width leads; the height follows from the edge opposite the one being dragged.
