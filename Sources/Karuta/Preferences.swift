@@ -1,13 +1,31 @@
 import AppKit
 import Carbon.HIToolbox
+import UniformTypeIdentifiers
 
 /// User settings, stored in UserDefaults. Defaults follow CleanShot: preview on, freeze on, sound on, PNG to Desktop.
 enum Preferences {
     static let didChange = Notification.Name("KarutaPreferencesDidChange")
 
     enum ImageFormat: String, CaseIterable {
-        case png, jpeg
-        var fileExtension: String { self == .png ? "png" : "jpg" }
+        case png, jpeg, heic
+
+        var fileExtension: String {
+            switch self {
+            case .png: "png"
+            case .jpeg: "jpg"
+            case .heic: "heic"
+            }
+        }
+
+        var utType: UTType {
+            switch self {
+            case .png: .png
+            case .jpeg: .jpeg
+            case .heic: .heic
+            }
+        }
+
+        var title: String { rawValue.uppercased() }
     }
 
     private static let defaults = UserDefaults.standard
@@ -68,6 +86,29 @@ enum Preferences {
     static var autoCloseSeconds: Int {
         get { defaults.integer(forKey: "autoCloseSeconds") }
         set { set(newValue, for: "autoCloseSeconds") }
+    }
+
+    /// Puts the mouse pointer in screenshots (with "画面を止めて選ぶ", where it was when the screen froze).
+    static var showCursor: Bool {
+        get { bool("showCursor", default: false) }
+        set { set(newValue, for: "showCursor") }
+    }
+
+    /// Copies and saves Retina shots at 1x (half the pixels), like CleanShot's "Scale Retina screenshots to 1x".
+    static var scaleRetina: Bool {
+        get { bool("scaleRetina", default: false) }
+        set { set(newValue, for: "scaleRetina") }
+    }
+
+    static let defaultFileNameTemplate = "Karuta {date} {time}"
+
+    /// The saved file's name; {date}, {time} and {app} (the app in front) are filled in.
+    static var fileNameTemplate: String {
+        get {
+            let value = defaults.string(forKey: "fileNameTemplate")?.trimmingCharacters(in: .whitespaces) ?? ""
+            return value.isEmpty ? defaultFileNameTemplate : value
+        }
+        set { set(newValue, for: "fileNameTemplate") }
     }
 
     /// Seconds the self-timer counts down before taking the shot.

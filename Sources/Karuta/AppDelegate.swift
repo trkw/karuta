@@ -145,11 +145,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func capture(_ mode: CaptureMode, delivery: Delivery = .settings) {
         guard !isCapturing else { return }
         isCapturing = true
+        // Before the selection overlay brings Karuta forward: the app being captured, for the file name.
+        let app = NSWorkspace.shared.frontmostApplication.flatMap { $0 == .current ? nil : $0.localizedName }
         Task {
             defer { self.isCapturing = false }
             do {
                 let content = try await Capturer.shareableContent()
-                let shot: Shot
+                var shot: Shot
                 let screen: NSScreen
                 let frame: NSRect // where the shot was on screen (AppKit global), for pinning it in place
                 var delivery = delivery
@@ -215,6 +217,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         isWindow = true
                     }
                 }
+                shot.app = app
                 self.deliver(shot, on: screen, frame: frame, isWindow: isWindow, delivery: delivery)
             } catch {
                 NSLog("Karuta: capture failed: \(error)")

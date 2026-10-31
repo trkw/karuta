@@ -1,10 +1,12 @@
 import AppKit
 @preconcurrency import ScreenCaptureKit
 
-/// A captured image plus the backing scale it was taken at (used for DPI metadata).
+/// A captured image plus the backing scale it was taken at (used for DPI metadata), and the app that was
+/// in front when it was taken (for the {app} file name token).
 struct Shot {
     let image: CGImage
     let scale: CGFloat
+    var app: String? = nil
 }
 
 enum CaptureError: Error {
@@ -40,7 +42,7 @@ enum Capturer {
         }
         config.width = Int((size.width * scale).rounded())
         config.height = Int((size.height * scale).rounded())
-        config.showsCursor = false
+        config.showsCursor = Preferences.showCursor
 
         let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
         return Shot(image: image, scale: scale)
