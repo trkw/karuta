@@ -40,7 +40,7 @@ enum Capturer {
         }
         config.width = Int((size.width * scale).rounded())
         config.height = Int((size.height * scale).rounded())
-        config.showsCursor = false
+        config.showsCursor = Preferences.showCursor
 
         let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
         return Shot(image: image, scale: scale)

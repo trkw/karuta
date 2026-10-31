@@ -337,12 +337,21 @@ private struct PageBuilder {
     }
 
     private func screenshots() -> [NSView] {
-        let format = NSSegmentedControl(labels: ["PNG", "JPEG"], trackingMode: .selectOne, target: nil, action: nil)
-        format.selectedSegment = Preferences.format == .png ? 0 : 1
+        let formats = Preferences.ImageFormat.allCases
+        let format = NSSegmentedControl(labels: formats.map(\.title), trackingMode: .selectOne, target: nil, action: nil)
+        format.selectedSegment = formats.firstIndex(of: Preferences.format) ?? 0
         ClosureTarget { sender in
             guard let control = sender as? NSSegmentedControl else { return }
-            Preferences.format = control.selectedSegment == 0 ? .png : .jpeg
+            Preferences.format = formats[control.selectedSegment]
         }.attach(to: format)
+        let fileName = NSTextField(string: Preferences.fileNameTemplate)
+        fileName.placeholderString = Preferences.defaultFileNameTemplate
+        fileName.cell?.sendsActionOnEndEditing = true
+        fileName.widthAnchor.constraint(equalToConstant: 220).isActive = true
+        ClosureTarget { sender in
+            guard let field = sender as? NSTextField else { return }
+            Preferences.fileNameTemplate = field.stringValue
+        }.attach(to: fileName)
         let backdrop = NSPopUpButton(frame: .zero, pullsDown: false)
         backdrop.addItems(withTitles: Preferences.AutoBackdrop.allCases.map(\.title))
         backdrop.selectItem(at: Preferences.AutoBackdrop.allCases.firstIndex(of: Preferences.autoBackdrop) ?? 0)
@@ -359,7 +368,17 @@ private struct PageBuilder {
             Preferences.selfTimerSeconds = timerChoices[popup.indexOfSelectedItem]
         }.attach(to: timer)
         return [
-            section("ファイル", rows: [row("形式", control: format)]),
+            section("ファイル", rows: [
+                row("形式", control: format),
+                row("ファイル名", control: fileName),
+                noteRow("{date} は日付、{time} は時刻、{app} は手前にあったアプリの名前になります。"),
+                switchRow("Retina を 1x に縮小", Preferences.scaleRetina,
+                          note: "コピーと保存の画像を半分のピクセル数にします（見た目の大きさは同じ）。") { Preferences.scaleRetina = $0 },
+            ]),
+            section("撮影", rows: [
+                switchRow("マウスカーソルを写す", Preferences.showCursor,
+                          note: "画面を止めて選ぶときは、止めた瞬間の位置のカーソルが写ります。") { Preferences.showCursor = $0 },
+            ]),
             section("背景", rows: [
                 row("撮影後に背景を付ける", control: backdrop),
                 noteRow("背景の種類と余白は、注釈エディタの背景ボタンで選んだものを使います。"),

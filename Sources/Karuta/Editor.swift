@@ -321,7 +321,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSTool
         guard let window else { return }
         let format = Preferences.format
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [format == .png ? .png : .jpeg]
+        panel.allowedContentTypes = [format.utType]
         panel.directoryURL = Preferences.saveDirectory
         panel.nameFieldStringValue = Exporter.defaultFileName(extension: format.fileExtension)
         let shot = canvas.renderedShot()
