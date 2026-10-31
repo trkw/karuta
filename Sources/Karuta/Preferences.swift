@@ -70,6 +70,12 @@ enum Preferences {
         set { set(newValue, for: "autoCloseSeconds") }
     }
 
+    /// Seconds the self-timer counts down before taking the shot.
+    static var selfTimerSeconds: Int {
+        get { defaults.object(forKey: "selfTimerSeconds") == nil ? 5 : defaults.integer(forKey: "selfTimerSeconds") }
+        set { set(newValue, for: "selfTimerSeconds") }
+    }
+
     // MARK: Editor backdrop
 
     enum BackdropStyle: String, CaseIterable {
@@ -183,7 +189,10 @@ enum Preferences {
 }
 
 enum ShortcutAction: String, CaseIterable {
-    case area, window, fullscreen, previousArea
+    case area, window, fullscreen, previousArea, selfTimer
+    case areaCopy, areaSave, areaAnnotate, areaPin
+    case openClipboard, openFile, pinFile, restoreClosed
+    case toggleOverlays, saveAllOverlays, closeAllOverlays
 
     var title: String {
         switch self {
@@ -191,17 +200,43 @@ enum ShortcutAction: String, CaseIterable {
         case .window: "ウィンドウを撮影"
         case .fullscreen: "全画面を撮影"
         case .previousArea: "前回の範囲を撮影"
+        case .selfTimer: "セルフタイマー"
+        case .areaCopy: "範囲を撮影してコピー"
+        case .areaSave: "範囲を撮影して保存"
+        case .areaAnnotate: "範囲を撮影して編集"
+        case .areaPin: "範囲を撮影してピン留め"
+        case .openClipboard: "クリップボードの画像を編集"
+        case .openFile: "画像を開いて編集…"
+        case .pinFile: "画像をピン留め…"
+        case .restoreClosed: "最近閉じたものを戻す"
+        case .toggleOverlays: "オーバーレイを隠す / 表示"
+        case .saveAllOverlays: "オーバーレイをすべて保存"
+        case .closeAllOverlays: "オーバーレイをすべて閉じる"
         }
     }
 
-    /// ⌘⇧4 / ⌘⇧5 / ⌘⇧3 like CleanShot (the macOS screenshot shortcuts must be turned off).
+    /// The section it is listed under in Settings > Shortcuts, like CleanShot's groups.
+    enum Group: String, CaseIterable {
+        case screenshots = "撮影", general = "一般", overlay = "クイックアクセス"
+    }
+
+    var group: Group {
+        switch self {
+        case .area, .window, .fullscreen, .previousArea, .selfTimer, .areaCopy, .areaSave, .areaAnnotate, .areaPin:
+            .screenshots
+        case .openClipboard, .openFile, .pinFile, .restoreClosed: .general
+        case .toggleOverlays, .saveAllOverlays, .closeAllOverlays: .overlay
+        }
+    }
+
+    /// ⌘⇧4 / ⌘⇧5 / ⌘⇧3 like CleanShot (the macOS screenshot shortcuts must be turned off). The rest start unset.
     var defaultShortcut: Shortcut? {
         let commandShift = UInt32(cmdKey | shiftKey)
         switch self {
         case .area: return Shortcut(keyCode: UInt32(kVK_ANSI_4), modifiers: commandShift)
         case .window: return Shortcut(keyCode: UInt32(kVK_ANSI_5), modifiers: commandShift)
         case .fullscreen: return Shortcut(keyCode: UInt32(kVK_ANSI_3), modifiers: commandShift)
-        case .previousArea: return nil
+        default: return nil
         }
     }
 }

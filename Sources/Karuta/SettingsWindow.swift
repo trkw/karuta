@@ -298,17 +298,23 @@ private struct PageBuilder {
     }
 
     private func shortcuts() -> [NSView] {
-        [
-            section("撮影", rows: ShortcutAction.allCases.map { action in
+        ShortcutAction.Group.allCases.map { group in
+            var rows = ShortcutAction.allCases.filter { $0.group == group }.map { action -> NSView in
                 let field = ShortcutField(shortcut: Preferences.shortcut(for: action))
                 field.onChange = { Preferences.setShortcut($0, for: action) }
                 field.onRecording = onRecordingShortcut
                 return row(action.title, control: field)
-            } + [
-                noteRow("欄をクリックして新しいキーを押します。Delete で解除、Esc で取り消し。⌘⇧3 / 4 / 5 を使うときは、"
-                    + "macOS の「キーボードショートカット」>「スクリーンショット」をオフにしてください。"),
-            ]),
-        ]
+            }
+            switch group {
+            case .screenshots:
+                rows.append(noteRow("欄をクリックして新しいキーを押します。Delete で解除、Esc で取り消し。⌘⇧3 / 4 / 5 を使うときは、"
+                    + "macOS の「キーボードショートカット」>「スクリーンショット」をオフにしてください。"
+                    + "「範囲を撮影して〜」は撮影後の動作の設定を使わず、その動作だけを行います。"))
+            case .general, .overlay:
+                break
+            }
+            return section(group.rawValue, rows: rows)
+        }
     }
 
     private func quickAccess() -> [NSView] {
@@ -344,6 +350,14 @@ private struct PageBuilder {
             guard let popup = sender as? NSPopUpButton else { return }
             Preferences.autoBackdrop = Preferences.AutoBackdrop.allCases[popup.indexOfSelectedItem]
         }.attach(to: backdrop)
+        let timerChoices = [3, 5, 10]
+        let timer = NSPopUpButton(frame: .zero, pullsDown: false)
+        timer.addItems(withTitles: timerChoices.map { "\($0) 秒" })
+        timer.selectItem(at: timerChoices.firstIndex(of: Preferences.selfTimerSeconds) ?? 1)
+        ClosureTarget { sender in
+            guard let popup = sender as? NSPopUpButton else { return }
+            Preferences.selfTimerSeconds = timerChoices[popup.indexOfSelectedItem]
+        }.attach(to: timer)
         return [
             section("ファイル", rows: [row("形式", control: format)]),
             section("背景", rows: [
@@ -355,6 +369,10 @@ private struct PageBuilder {
                           note: "動画やメニューが動いていても、選び始めた瞬間の画面を撮ります。") { Preferences.freezeScreen = $0 },
                 switchRow("拡大鏡を表示", Preferences.showLoupe,
                           note: "画面を止めているときに使えます。") { Preferences.showLoupe = $0 },
+            ]),
+            section("セルフタイマー", rows: [
+                row("撮るまでの時間", control: timer),
+                noteRow("範囲を選んでから撮るまで待ちます。メニューを開いた状態などを撮るときに使います。"),
             ]),
         ]
     }

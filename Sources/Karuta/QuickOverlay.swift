@@ -51,17 +51,20 @@ final class QuickOverlay {
                 try Exporter.save(card.shot)
                 remove(card, animated: true)
             } catch {
-                let alert = NSAlert(error: error)
-                alert.messageText = "保存できませんでした"
-                NSApp.activate()
-                alert.runModal()
+                Self.showSaveError(error)
             }
+        case .saveAs:
+            if Exporter.saveAs(card.shot) { remove(card, animated: true) }
         case .edit:
-            remove(card, animated: false)
+            remove(card, animated: false, remember: false)
             onEdit?(card.original ?? card.shot, card.original != nil)
         case .pin:
-            remove(card, animated: false)
+            remove(card, animated: false, remember: false)
             onPin?(card.shot, card.frame)
+        case .saveAll:
+            saveAll()
+        case .closeAll:
+            closeAll()
         case .close, .dropped:
             remove(card, animated: true)
         case .swiped:
@@ -69,6 +72,46 @@ final class QuickOverlay {
         case .hide:
             setStackHidden(true)
         }
+    }
+
+    // MARK: Whole stack (menu bar and global shortcuts)
+
+    /// Tucks the stack away, or brings it back.
+    func toggleHidden() {
+        guard !cards.isEmpty else { return }
+        setStackHidden(!isStackHidden)
+    }
+
+    /// Saves every card to the save folder and closes them; a card that fails stays.
+    func saveAll() {
+        var failure: Error?
+        for card in cards.reversed() {
+            do {
+                try Exporter.save(card.shot)
+                remove(card, animated: true)
+            } catch {
+                failure = error
+            }
+        }
+        if let failure { Self.showSaveError(failure) }
+    }
+
+    func closeAll() {
+        for card in cards.reversed() { remove(card, animated: true) }
+    }
+
+    /// Brings back the most recently closed card.
+    func restoreClosed(on screen: NSScreen) -> Bool {
+        guard let entry = ClosedShots.popLast() else { return false }
+        show(entry.shot, original: entry.original, on: screen)
+        return true
+    }
+
+    private static func showSaveError(_ error: Error) {
+        let alert = NSAlert(error: error)
+        alert.messageText = "保存できませんでした"
+        NSApp.activate()
+        alert.runModal()
     }
 
     private func setStackHidden(_ hidden: Bool) {
@@ -96,8 +139,11 @@ final class QuickOverlay {
         self.tab = tab
     }
 
-    private func remove(_ card: OverlayCard, animated: Bool, slideOut: Bool = false) {
+    /// `remember` keeps the shot for "最近閉じたものを戻す" (not when it moves on to the editor or a pin).
+    private func remove(_ card: OverlayCard, animated: Bool, slideOut: Bool = false, remember: Bool = true) {
+        guard cards.contains(where: { $0 === card }) else { return }
         cards.removeAll { $0 === card }
+        if remember { ClosedShots.add(card.shot, original: card.original) }
         if animated {
             var frame = card.frame
             if slideOut { frame.origin.x = card.screenFrame.minX - frame.width }
@@ -158,7 +204,7 @@ final class QuickOverlay {
 
 private final class OverlayCard: NSPanel {
     enum Action {
-        case copy, save, edit, pin, close, dropped, swiped, hide
+        case copy, save, saveAs, edit, pin, close, dropped, swiped, hide, saveAll, closeAll
     }
 
     let shot: Shot
@@ -390,6 +436,26 @@ private final class CardView: NSView, NSDraggingSource {
         if event.keyCode == 53 { onAction?(.close) } else { super.keyDown(with: event) }
     }
 
+    /// Right click: every card action, plus the whole-stack ones, like CleanShot's overlay menu.
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = NSMenu()
+        let items: [(String, OverlayCard.Action)?] = [
+            ("コピー", .copy), ("保存", .save), ("別名で保存…", .saveAs), nil,
+            ("編集", .edit), ("ピン留め", .pin), nil,
+            ("閉じる", .close), nil,
+            ("すべて保存", .saveAll), ("すべて閉じる", .closeAll),
+        ]
+        for entry in items {
+            guard let entry else {
+                menu.addItem(.separator())
+                continue
+            }
+            let (title, action) = entry
+            menu.addItem(MenuAction(title: title) { [weak self] in self?.onAction?(action) })
+        }
+        return menu
+    }
+
     override func mouseDown(with event: NSEvent) {
         mouseDownPoint = event.locationInWindow
         if event.clickCount == 2 { onAction?(.edit) }
@@ -563,4 +629,20 @@ private final class TabButton: ClosureButton {
                                    width: size.width, height: size.height))
         }
     }
+}
+
+/// A menu item that runs a closure (keeps itself as its own target).
+final class MenuAction: NSMenuItem {
+    private let handler: () -> Void
+
+    init(title: String, handler: @escaping () -> Void) {
+        self.handler = handler
+        super.init(title: title, action: #selector(fire), keyEquivalent: "")
+        target = self
+    }
+
+    @available(*, unavailable)
+    required init(coder: NSCoder) { fatalError() }
+
+    @objc private func fire() { handler() }
 }
