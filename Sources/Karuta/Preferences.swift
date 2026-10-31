@@ -230,13 +230,14 @@ enum Preferences {
 }
 
 enum ShortcutAction: String, CaseIterable {
-    case area, window, fullscreen, previousArea, selfTimer
+    case allInOne, area, window, fullscreen, previousArea, selfTimer
     case areaCopy, areaSave, areaAnnotate, areaPin
     case openClipboard, openFile, pinFile, restoreClosed
     case toggleOverlays, saveAllOverlays, closeAllOverlays
 
     var title: String {
         switch self {
+        case .allInOne: "All-In-One"
         case .area: "範囲を撮影"
         case .window: "ウィンドウを撮影"
         case .fullscreen: "全画面を撮影"
@@ -263,7 +264,8 @@ enum ShortcutAction: String, CaseIterable {
 
     var group: Group {
         switch self {
-        case .area, .window, .fullscreen, .previousArea, .selfTimer, .areaCopy, .areaSave, .areaAnnotate, .areaPin:
+        case .allInOne, .area, .window, .fullscreen, .previousArea, .selfTimer,
+             .areaCopy, .areaSave, .areaAnnotate, .areaPin:
             .screenshots
         case .openClipboard, .openFile, .pinFile, .restoreClosed: .general
         case .toggleOverlays, .saveAllOverlays, .closeAllOverlays: .overlay
