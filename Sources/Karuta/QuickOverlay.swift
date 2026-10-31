@@ -102,8 +102,8 @@ final class QuickOverlay {
 
     /// Brings back the most recently closed card.
     func restoreClosed(on screen: NSScreen) -> Bool {
-        guard let shot = ClosedShots.popLast() else { return false }
-        show(shot, on: screen)
+        guard let entry = ClosedShots.popLast() else { return false }
+        show(entry.shot, original: entry.original, on: screen)
         return true
     }
 
@@ -143,7 +143,7 @@ final class QuickOverlay {
     private func remove(_ card: OverlayCard, animated: Bool, slideOut: Bool = false, remember: Bool = true) {
         guard cards.contains(where: { $0 === card }) else { return }
         cards.removeAll { $0 === card }
-        if remember { ClosedShots.add(card.shot) }
+        if remember { ClosedShots.add(card.shot, original: card.original) }
         if animated {
             var frame = card.frame
             if slideOut { frame.origin.x = card.screenFrame.minX - frame.width }
