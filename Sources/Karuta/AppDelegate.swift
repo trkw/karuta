@@ -3,7 +3,7 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     enum CaptureMode {
-        case area, window, fullscreen, previousArea, selfTimer
+        case allInOne, area, window, fullscreen, previousArea, selfTimer
     }
 
     /// What to do with a shot: the After Capture settings, or one fixed action ("範囲を撮影してコピー" etc.).
@@ -59,7 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func rebuildMenu() {
         let menu = NSMenu()
         let groups: [[ShortcutAction]] = [
-            [.area, .window, .fullscreen, .previousArea, .selfTimer],
+            [.allInOne, .area, .window, .fullscreen, .previousArea, .selfTimer],
             [.openClipboard, .openFile, .pinFile, .restoreClosed],
         ]
         for group in groups {
@@ -97,6 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func perform(_ action: ShortcutAction) {
         switch action {
+        case .allInOne: capture(.allInOne)
         case .area: capture(.area)
         case .window: capture(.window)
         case .fullscreen: capture(.fullscreen)
@@ -177,15 +178,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     screen = lastScreen
                     frame = rect
                     shot = try await Capturer.captureDisplay(of: screen, rect: rect, content: content)
-                case .area, .window, .selfTimer:
-                    let timed = mode == .selfTimer
+                case .area, .window, .selfTimer, .allInOne:
+                    var timed = mode == .selfTimer
                     let candidates = Capturer.orderedWindows(in: content)
                     // Freeze the screen first, so the selection is made on (and cut from) a still image.
                     // The self-timer captures the live screen after the countdown, so it never freezes.
                     var frozen: [CGDirectDisplayID: Shot] = [:]
                     if Preferences.freezeScreen && !timed { frozen = await Capturer.freezeDisplays(content: content) }
+                    // All-In-One starts on the previous area, ready to adjust.
+                    let initial = mode == .allInOne ? self.lastArea.flatMap { last in
+                        NSScreen.screens.first { $0.displayID == last.displayID }
+                            .map { last.rect.offsetBy(dx: $0.frame.minX, dy: $0.frame.minY) }
+                    } : nil
                     let result = await self.selection.run(windowMode: mode == .window, candidates: candidates,
-                                                          frozen: frozen)
+                                                          frozen: frozen, allInOne: mode == .allInOne,
+                                                          initial: initial)
+                    if mode == .allInOne {
+                        switch self.selection.action {
+                        case .capture: break
+                        case .copy: delivery = .copy
+                        case .save: delivery = .save
+                        case .annotate: delivery = .annotate
+                        case .pin: delivery = .pin
+                        case .timer: timed = true
+                        }
+                    }
                     // Holding ⌃ while finishing the selection copies instead (CleanShot does the same).
                     if delivery == .settings && NSEvent.modifierFlags.contains(.control) { delivery = .copy }
                     switch result {
