@@ -628,7 +628,7 @@ private final class SelectionView: NSView {
         let fixed = controller.fixedSize != nil
         if !isDragging, !fixed { drawGuides(at: mouse) }
         drawLoupe(at: mouse)
-        let ratio = controller.aspect == .free || fixed ? "" : controller.aspect.title
+        let ratio = controller.allInOne || controller.aspect == .free || fixed ? "" : controller.aspect.title
         if let rect = selection {
             drawPill("\(Int(rect.width)) × \(Int(rect.height))" + (ratio.isEmpty ? "" : "  \(ratio)"), near: mouse)
         } else if !ratio.isEmpty {
