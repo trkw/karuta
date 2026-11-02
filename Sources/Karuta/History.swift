@@ -48,6 +48,8 @@ enum CaptureHistory {
     }()
 
     private static let thumbnails = NSCache<NSString, CGImage>()
+    /// Bumped whenever everything is removed, so captures still being encoded don't come back afterwards.
+    private static var generation = 0
 
     static func url(for item: Item) -> URL { directory.appendingPathComponent("\(item.id).png") }
 
@@ -57,11 +59,17 @@ enum CaptureHistory {
         let item = Item(id: UUID().uuidString, date: Date(), kind: kind, width: shot.image.width,
                         height: shot.image.height, scale: Double(shot.scale), app: shot.app)
         let url = url(for: item)
+        let started = generation
         // Encode off the main thread; the item shows up once its file exists.
         Task.detached(priority: .utility) {
             guard let data = Exporter.pngData(shot), (try? data.write(to: url)) != nil else { return }
             await MainActor.run {
-                items.insert(item, at: 0)
+                guard generation == started, Preferences.historyDays > 0 else {
+                    try? FileManager.default.removeItem(at: url)
+                    return
+                }
+                // Encodes can finish out of order (a big fullscreen after a small area); keep newest first.
+                items.insert(item, at: items.firstIndex { $0.date < item.date } ?? items.count)
                 prune()
                 save()
             }
@@ -72,6 +80,7 @@ enum CaptureHistory {
     static func prune() {
         let days = Preferences.historyDays
         let cutoff = Date().addingTimeInterval(-Double(days) * 86_400)
+        if days <= 0 { generation += 1 }
         let expired = items.filter { days <= 0 || $0.date < cutoff }
         guard !expired.isEmpty else { return }
         remove(expired)
@@ -87,7 +96,10 @@ enum CaptureHistory {
         save()
     }
 
-    static func clear() { remove(items) }
+    static func clear() {
+        generation += 1
+        remove(items)
+    }
 
     static func shot(for item: Item) -> Shot? {
         guard var shot = ImageLoader.shot(contentsOf: url(for: item)) else { return nil }
