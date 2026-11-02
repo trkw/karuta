@@ -343,7 +343,7 @@ enum Preferences {
 }
 
 enum ShortcutAction: String, CaseIterable {
-    case allInOne, area, window, fullscreen, previousArea, selfTimer
+    case allInOne, area, window, fullscreen, previousArea, selfTimer, recordScreen
     case areaCopy, areaSave, areaAnnotate, areaPin
     case openClipboard, openFile, pinFile, restoreClosed, openHistory
     case togglePins, unlockPins, closeAllPins
@@ -357,6 +357,7 @@ enum ShortcutAction: String, CaseIterable {
         case .fullscreen: "全画面を撮影"
         case .previousArea: "前回の範囲を撮影"
         case .selfTimer: "セルフタイマー"
+        case .recordScreen: "画面を収録 / 停止"
         case .areaCopy: "範囲を撮影してコピー"
         case .areaSave: "範囲を撮影して保存"
         case .areaAnnotate: "範囲を撮影して編集"
@@ -382,7 +383,7 @@ enum ShortcutAction: String, CaseIterable {
 
     var group: Group {
         switch self {
-        case .allInOne, .area, .window, .fullscreen, .previousArea, .selfTimer,
+        case .allInOne, .area, .window, .fullscreen, .previousArea, .selfTimer, .recordScreen,
              .areaCopy, .areaSave, .areaAnnotate, .areaPin:
             .screenshots
         case .openClipboard, .openFile, .pinFile, .restoreClosed, .openHistory: .general

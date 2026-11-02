@@ -59,6 +59,7 @@
 - セルフタイマー: 範囲（Space でウィンドウ）を選ぶと、カウントダウンのあと撮ります（3 / 5 / 10 秒、設定 >「スクリーンショット」）。メニューを開いた状態などを撮るときに。カウントダウンをクリックすると中止
 - 範囲を選び終えるときに ⌃ を押していると、撮影後の動作の設定にかかわらずコピーだけします
 - 「範囲を撮影してコピー / 保存 / 編集 / ピン留め」は、その動作だけを行います（ショートカットは設定で割り当て）
+- **画面収録**（メニュー >「画面を収録 / 停止」、ショートカットは設定で割り当て）: 範囲（Space でウィンドウ）を選ぶと、3 秒のカウントダウンのあと MP4 で収録します。収録中は範囲が赤い点線で囲まれ、メニューバーのアイコンが経過時間付きの停止ボタンになります（クリックか同じショートカットで停止）。止めると撮影後の動作の設定どおりにクイックアクセスへ出ます。カードの「編集」は QuickTime Player などで開き（トリムはそちらで）、コピーはファイルとして貼り付けられます
 - メニューから「クリップボードの画像を編集」「画像を開いて編集…」「画像をピン留め…」「最近閉じたものを戻す」（直近 5 枚）も使えます
 
 ### 設定（メニュー >「設定…」/ ⌘,）
@@ -110,6 +111,7 @@ open "karuta://pin?filepath=~/Desktop/image.png"
 | `capture-area` | `x` `y` `width` `height` `display`（4 つそろえると、その範囲を選ばずに撮影）、`action` |
 | `capture-previous-area` / `capture-fullscreen` / `capture-window` / `self-timer` | `action` |
 | `all-in-one` | `x` `y` `width` `height` `display`（始めの範囲） |
+| `record-screen` | `x` `y` `width` `height` `display`（なければ範囲を選ぶ）。収録中に呼ぶと停止 |
 | `pin` / `open-annotate` | `filepath`（なければファイルを選ぶ） |
 | `add-quick-access-overlay` | `filepath`（必須） |
 | `open-from-clipboard` / `open-history` / `restore-recently-closed` | なし |
