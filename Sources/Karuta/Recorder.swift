@@ -159,8 +159,15 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
         generator.requestedTimeToleranceBefore = tolerance
         generator.requestedTimeToleranceAfter = tolerance
 
-        let gif = movie.deletingPathExtension().appendingPathExtension("gif")
-        try? FileManager.default.removeItem(at: gif)
+        // Never replace an earlier GIF: a Quick Access card or the clipboard may still point at it.
+        let base = movie.deletingPathExtension()
+        var gif = base.appendingPathExtension("gif")
+        var n = 2
+        while FileManager.default.fileExists(atPath: gif.path) {
+            gif = base.deletingLastPathComponent()
+                .appendingPathComponent("\(base.lastPathComponent) (\(n)).gif")
+            n += 1
+        }
         guard let destination = CGImageDestinationCreateWithURL(gif as CFURL, UTType.gif.identifier as CFString, count, nil)
         else { throw CocoaError(.fileWriteUnknown) }
         let loop = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]]
