@@ -327,7 +327,7 @@ private struct PageBuilder {
                 rows.append(noteRow("欄をクリックして新しいキーを押します。Delete で解除、Esc で取り消し。⌘⇧3 / 4 / 5 を使うときは、"
                     + "macOS の「キーボードショートカット」>「スクリーンショット」をオフにしてください。"
                     + "「範囲を撮影して〜」は撮影後の動作の設定を使わず、その動作だけを行います。"))
-            case .general, .overlay:
+            case .general, .overlay, .pins:
                 break
             }
             return section(group.rawValue, rows: rows)
@@ -349,8 +349,32 @@ private struct PageBuilder {
                 switchRow("撮影後にサムネイルを表示", Preferences.showOverlay) { Preferences.showOverlay = $0 },
                 row("自動で閉じる", control: popup),
                 noteRow("カーソルを乗せている間は閉じません。"),
+                row("位置", control: overlayPositionControl()),
+                row("大きさ", control: overlaySizeControl()),
+                noteRow("位置と大きさは、次に出るサムネイルから変わります。"),
             ]),
         ]
+    }
+
+    private func overlayPositionControl() -> NSView {
+        let control = NSSegmentedControl(labels: ["左下", "右下"], trackingMode: .selectOne, target: nil, action: nil)
+        control.selectedSegment = Preferences.overlayOnRight ? 1 : 0
+        ClosureTarget { sender in
+            guard let control = sender as? NSSegmentedControl else { return }
+            Preferences.overlayOnRight = control.selectedSegment == 1
+        }.attach(to: control)
+        return control
+    }
+
+    private func overlaySizeControl() -> NSView {
+        let sizes = Preferences.OverlaySize.allCases
+        let control = NSSegmentedControl(labels: sizes.map(\.title), trackingMode: .selectOne, target: nil, action: nil)
+        control.selectedSegment = sizes.firstIndex(of: Preferences.overlaySize) ?? 1
+        ClosureTarget { sender in
+            guard let control = sender as? NSSegmentedControl else { return }
+            Preferences.overlaySize = sizes[control.selectedSegment]
+        }.attach(to: control)
+        return control
     }
 
     private func screenshots() -> [NSView] {
