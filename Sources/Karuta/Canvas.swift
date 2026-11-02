@@ -41,6 +41,17 @@ enum Tool: CaseIterable {
         }
     }
 
+    /// Tools with a choice of looks (`Annotation.style`), by the name the choice is remembered under.
+    var styleKey: String? {
+        switch self {
+        case .arrow: "arrow"
+        case .text: "text"
+        case .pixelate: "pixelate"
+        case .counter: "counter"
+        default: nil
+        }
+    }
+
     /// Single-key shortcut, following CleanShot where it has one.
     var key: String {
         switch self {
@@ -65,7 +76,8 @@ enum Tool: CaseIterable {
 /// The editing surface: shows the shot (optionally cropped and on a backdrop) at a zoom, and turns mouse
 /// input into annotations. Coordinates in annotations are image points with a bottom-left origin.
 final class CanvasView: NSView, NSTextFieldDelegate {
-    let renderer: AnnotationRenderer
+    /// Replaced when the picture itself is rotated or flipped.
+    private(set) var renderer: AnnotationRenderer
 
     var tool: Tool = .arrow {
         didSet {
@@ -95,8 +107,17 @@ final class CanvasView: NSView, NSTextFieldDelegate {
     var onStateChange: (() -> Void)?
 
     private(set) var annotations: [Annotation] = [] { didSet { needsDisplay = true } }
-    private var undoStack: [[Annotation]] = []
-    private var redoStack: [[Annotation]] = []
+    /// Undo keeps the picture too, so rotating and flipping can be undone.
+    private struct Snapshot {
+        var annotations: [Annotation]
+        var renderer: AnnotationRenderer
+        var crop: NSRect?
+    }
+
+    private var undoStack: [Snapshot] = []
+    private var redoStack: [Snapshot] = []
+    /// The next counter's number when typed in; otherwise it follows the highest one on the picture.
+    private var counterOverride: Int?
     private var preview: Annotation? { didSet { needsDisplay = true } }
     private var crop: NSRect? { didSet { needsDisplay = true } }
     private var selected: Int? { didSet { needsDisplay = true } }
@@ -131,27 +152,136 @@ final class CanvasView: NSView, NSTextFieldDelegate {
 
     // MARK: History
 
+    private var snapshot: Snapshot { Snapshot(annotations: annotations, renderer: renderer, crop: crop) }
+
     private func commit(_ new: [Annotation]) {
-        undoStack.append(annotations)
+        undoStack.append(snapshot)
         redoStack.removeAll()
         annotations = new
+        onStateChange?()
+    }
+
+    private func restore(_ state: Snapshot) {
+        annotations = state.annotations
+        // The crop isn't part of undo on its own; it only comes back with the picture it was made on.
+        if state.renderer !== renderer {
+            renderer = state.renderer
+            crop = state.crop
+            updateFrame()
+        }
+        selected = nil
         onStateChange?()
     }
 
     func undo() {
         commitText()
         guard let previous = undoStack.popLast() else { return }
-        redoStack.append(annotations)
-        annotations = previous
-        selected = nil
-        onStateChange?()
+        redoStack.append(snapshot)
+        restore(previous)
     }
 
     func redo() {
         guard let next = redoStack.popLast() else { return }
-        undoStack.append(annotations)
-        annotations = next
+        undoStack.append(snapshot)
+        restore(next)
+    }
+
+    // MARK: Looks
+
+    func style(for tool: Tool) -> Int {
+        tool.styleKey.map(Preferences.editorStyle) ?? 0
+    }
+
+    /// Remembers the look for the tool, and restyles the selected mark if it was made with that tool.
+    func setStyle(_ style: Int, for tool: Tool) {
+        guard let key = tool.styleKey else { return }
+        Preferences.setEditorStyle(style, for: key)
+        if let index = selected, annotations.indices.contains(index), Self.tool(for: annotations[index]) == tool {
+            restyleSelection { $0.style = style }
+        } else {
+            onStateChange?()
+        }
+    }
+
+    /// The tool whose looks the toolbar offers: the current one, or with Select, the selected mark's.
+    var styleTarget: Tool? {
+        if tool != .select { return tool.styleKey == nil ? nil : tool }
+        guard let index = selected, annotations.indices.contains(index) else { return nil }
+        return Self.tool(for: annotations[index])
+    }
+
+    private static func tool(for annotation: Annotation) -> Tool? {
+        switch annotation.kind {
+        case .arrow: .arrow
+        case .text: .text
+        case .pixelate: .pixelate
+        case .counter: .counter
+        default: nil
+        }
+    }
+
+    var nextCounter: Int {
+        get {
+            if let counterOverride { return counterOverride }
+            var highest = 0
+            for annotation in annotations {
+                if case let .counter(_, n) = annotation.kind { highest = max(highest, n) }
+            }
+            return highest + 1
+        }
+        set { counterOverride = max(0, newValue) }
+    }
+
+    private func mark(_ kind: Annotation.Kind) -> Annotation {
+        Annotation(kind: kind, color: color, width: lineWidth, style: style(for: tool))
+    }
+
+    // MARK: Edits
+
+    /// ⌘D: a copy of the selected mark, a little down and to the right.
+    func duplicateSelection() -> Bool {
+        guard let index = selected, annotations.indices.contains(index) else { return false }
+        var list = annotations
+        list.append(list[index].offsetBy(dx: 12, dy: -12))
+        selected = list.count - 1
+        commit(list)
+        return true
+    }
+
+    enum Transform { case rotateLeft, rotateRight, flipHorizontal, flipVertical }
+
+    /// Rotates or flips the picture. The marks and crop are baked in first, so they turn with it.
+    func apply(_ transform: Transform) {
+        commitText()
+        let shot = renderer.render(annotations, crop: crop)
+        let w = CGFloat(shot.image.width), h = CGFloat(shot.image.height)
+        let rotates = transform == .rotateLeft || transform == .rotateRight
+        guard let context = AnnotationRenderer.bitmap(width: Int(rotates ? h : w), height: Int(rotates ? w : h),
+                                                      space: shot.image.colorSpace)
+        else { return }
+        switch transform {
+        case .rotateLeft:
+            context.translateBy(x: h, y: 0)
+            context.rotate(by: .pi / 2)
+        case .rotateRight:
+            context.translateBy(x: 0, y: w)
+            context.rotate(by: -.pi / 2)
+        case .flipHorizontal:
+            context.translateBy(x: w, y: 0)
+            context.scaleBy(x: -1, y: 1)
+        case .flipVertical:
+            context.translateBy(x: 0, y: h)
+            context.scaleBy(x: 1, y: -1)
+        }
+        context.draw(shot.image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        guard let image = context.makeImage() else { return }
+        undoStack.append(snapshot)
+        redoStack.removeAll()
+        renderer = AnnotationRenderer(shot: Shot(image: image, scale: shot.scale, app: shot.app))
+        annotations = []
+        crop = nil
         selected = nil
+        updateFrame()
         onStateChange?()
     }
 
@@ -326,11 +456,12 @@ final class CanvasView: NSView, NSTextFieldDelegate {
             beginText(at: p)
             dragStart = nil
         case .counter:
-            let next = annotations.filter { if case .counter = $0.kind { true } else { false } }.count + 1
-            commit(annotations + [Annotation(kind: .counter(p, next), color: color, width: lineWidth)])
+            let next = nextCounter
+            counterOverride = nil
+            commit(annotations + [mark(.counter(p, next))])
             dragStart = nil
         case .pen, .highlighter:
-            preview = Annotation(kind: tool == .pen ? .pen([p]) : .highlighter([p]), color: color, width: lineWidth)
+            preview = mark(tool == .pen ? .pen([p]) : .highlighter([p]))
         default:
             break
         }
@@ -360,10 +491,10 @@ final class CanvasView: NSView, NSTextFieldDelegate {
             case .blur: .blur(r)
             default: .spotlight(r)
             }
-            preview = Annotation(kind: kind, color: color, width: lineWidth)
+            preview = mark(kind)
         case .line, .arrow:
             let end = shift ? Self.snap(p, from: start) : p
-            preview = Annotation(kind: tool == .line ? .line(start, end) : .arrow(start, end), color: color, width: lineWidth)
+            preview = mark(tool == .line ? .line(start, end) : .arrow(start, end))
         case .pen, .highlighter:
             guard var current = preview else { return }
             switch current.kind {
@@ -400,6 +531,8 @@ final class CanvasView: NSView, NSTextFieldDelegate {
         commit(annotations + [preview])
     }
 
+    static let widthSteps: [CGFloat] = [1, 2, 4, 6, 8, 12]
+
     private static func rect(from a: NSPoint, to b: NSPoint, square: Bool) -> NSRect {
         var dx = b.x - a.x, dy = b.y - a.y
         if square {
@@ -426,6 +559,12 @@ final class CanvasView: NSView, NSTextFieldDelegate {
         let key = event.charactersIgnoringModifiers?.lowercased() ?? ""
         if modifiers.isEmpty, let tool = Tool.allCases.first(where: { $0.key == key }) {
             self.tool = tool
+            return
+        }
+        // 1–6: stroke width, thin to thick.
+        if modifiers.isEmpty, let digit = Int(key), (1 ... 6).contains(digit) {
+            lineWidth = Self.widthSteps[digit - 1]
+            onStateChange?()
             return
         }
         switch (event.keyCode, key) {
@@ -459,7 +598,7 @@ final class CanvasView: NSView, NSTextFieldDelegate {
 
     private func beginText(at point: NSPoint) {
         textOrigin = point
-        let sample = Annotation(kind: .text(point, ""), color: color, width: lineWidth)
+        let sample = mark(.text(point, ""))
         let font = NSFont.systemFont(ofSize: sample.textFont.pointSize * zoom, weight: .bold)
         let field = NSTextField(frame: NSRect(origin: viewPoint(point),
                                               size: NSSize(width: 260, height: font.boundingRectForFont.height)))
@@ -492,7 +631,7 @@ final class CanvasView: NSView, NSTextFieldDelegate {
         let string = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         field.removeFromSuperview()
         if !string.isEmpty {
-            commit(annotations + [Annotation(kind: .text(textOrigin, string), color: color, width: lineWidth)])
+            commit(annotations + [mark(.text(textOrigin, string))])
         }
     }
 }
