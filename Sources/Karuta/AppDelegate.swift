@@ -80,7 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             overlay.show(shot, on: NSScreen.underMouse)
         case .openHistory: perform(.openHistory)
         case .restoreClosed: perform(.restoreClosed)
-        case let .openSettings(page): openSettings(page: page)
+        case let .openSettings(page): showSettings(page)
         case let .shortcut(action): perform(action)
         }
     }
@@ -195,10 +195,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
-        openSettings(page: nil)
+        showSettings(nil)
     }
 
-    private func openSettings(page: SettingsPage?) {
+    private func showSettings(_ page: SettingsPage?) {
         if settings == nil {
             let controller = SettingsWindowController()
             controller.onClose = { [weak self] in self?.settings = nil }
