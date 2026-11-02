@@ -109,7 +109,7 @@ CleanShot X（5.x 時点）の公開情報から挙動を洗い出し、Karuta �
 
 | CleanShot X | Karuta | メモ |
 | --- | --- | --- |
-| URL スキーム API（`/capture-area` など） | ✅ | v0.14.0。`karuta://`。OCR・収録・スクロール・デスクトップアイコンのコマンドは未 |
+| URL スキーム API（`/capture-area` など） | ✅ | v0.14.0。`karuta://`。v0.15.0 で `record-screen`、v0.17.0 で `scrolling-capture`。OCR・デスクトップアイコンは未 |
 | 設定を開く URL（タブ指定） | ✅ | v0.14.0（`open-settings?tab=`） |
 
 ## 実装の順番
