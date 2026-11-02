@@ -105,6 +105,7 @@ enum URLCommand {
         case "shortcuts": .shortcuts
         case "quickaccess", "quick-access": .quickAccess
         case "screenshots", "annotate", "wallpaper": .screenshots
+        case "recording": .recording
         case "about": .about
         default: .general
         }

@@ -73,7 +73,7 @@ enum Exporter {
     static func saveAs(_ shot: Shot) -> Bool {
         if let video = shot.video {
             let panel = NSSavePanel()
-            panel.allowedContentTypes = [.mpeg4Movie]
+            panel.allowedContentTypes = [UTType(filenameExtension: video.pathExtension) ?? .mpeg4Movie]
             panel.directoryURL = Preferences.saveDirectory
             panel.nameFieldStringValue = defaultFileName(extension: video.pathExtension, app: shot.app)
             NSApp.activate()
