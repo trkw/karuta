@@ -293,8 +293,25 @@ private struct PageBuilder {
                 row("保存先", control: folderControl()),
                 noteRow("クイックアクセスの「保存」や、撮影後の保存で使う場所です。"),
             ]),
+            section("撮影履歴", rows: [
+                row("残す期間", control: historyPicker()),
+                noteRow("撮ったものをメニューの「撮影履歴…」から開き直せます。過ぎたものは消えます。"),
+            ]),
             afterCapture(),
         ]
+    }
+
+    private func historyPicker() -> NSView {
+        let choices: [(String, Int)] = [("残さない", 0), ("1 日", 1), ("1 週間", 7), ("1 か月", 30)]
+        let popup = NSPopUpButton(frame: .zero, pullsDown: false)
+        popup.addItems(withTitles: choices.map(\.0))
+        popup.selectItem(at: choices.firstIndex { $0.1 == Preferences.historyDays } ?? 2)
+        ClosureTarget { sender in
+            guard let popup = sender as? NSPopUpButton else { return }
+            Preferences.historyDays = choices[popup.indexOfSelectedItem].1
+            CaptureHistory.prune()
+        }.attach(to: popup)
+        return popup
     }
 
     private func shortcuts() -> [NSView] {
