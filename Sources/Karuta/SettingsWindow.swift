@@ -10,6 +10,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     var onRecordingShortcut: ((Bool) -> Void)?
 
     private let pageHost = PageHostController()
+    private let sidebar = SidebarController()
 
     init() {
         let window = SettingsWindow(
@@ -24,7 +25,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
         window.delegate = self
 
-        let sidebar = SidebarController()
         sidebar.onSelect = { [weak self] page in self?.show(page) }
         pageHost.onRecordingShortcut = { [weak self] recording in self?.onRecordingShortcut?(recording) }
 
@@ -52,6 +52,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     private func show(_ page: SettingsPage) {
         pageHost.show(page)
+    }
+
+    /// Opens a page as if it was clicked in the sidebar.
+    func select(_ page: SettingsPage) {
+        sidebar.select(page)
     }
 }
 
@@ -137,7 +142,8 @@ private final class SidebarController: NSViewController {
         select(.general)
     }
 
-    private func select(_ page: SettingsPage) {
+    func select(_ page: SettingsPage) {
+        loadViewIfNeeded()
         rows.forEach { $0.isSelected = $0.page == page }
         onSelect?(page)
     }
