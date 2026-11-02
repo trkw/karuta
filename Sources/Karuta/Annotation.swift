@@ -33,16 +33,24 @@ struct Annotation {
     /// The bend of a curved arrow: a point off the middle of the line, a quarter of its length to the left.
     static func curveControl(_ a: NSPoint, _ b: NSPoint) -> NSPoint {
         let dx = b.x - a.x, dy = b.y - a.y
-        return NSPoint(x: (a.x + b.x) / 2 - dy * 0.25, y: (a.y + b.y) / 2 + dx * 0.25)
+        let x: CGFloat = (a.x + b.x) / 2 - dy * 0.25
+        let y: CGFloat = (a.y + b.y) / 2 + dx * 0.25
+        return NSPoint(x: x, y: y)
     }
 
     /// The points along a curved arrow, for hit-testing and bounds.
     private static func curvePoints(_ a: NSPoint, _ b: NSPoint) -> [NSPoint] {
         let c = curveControl(a, b)
-        return (0 ... 16).map { i in
-            let t = CGFloat(i) / 16, u = 1 - t
-            return NSPoint(x: u * u * a.x + 2 * u * t * c.x + t * t * b.x, y: u * u * a.y + 2 * u * t * c.y + t * t * b.y)
+        var points: [NSPoint] = []
+        for i in 0 ... 16 {
+            let t = CGFloat(i) / 16
+            let u: CGFloat = 1 - t
+            let wa: CGFloat = u * u, wc: CGFloat = 2 * u * t, wb: CGFloat = t * t
+            let x: CGFloat = wa * a.x + wc * c.x + wb * b.x
+            let y: CGFloat = wa * a.y + wc * c.y + wb * b.y
+            points.append(NSPoint(x: x, y: y))
         }
+        return points
     }
 
     private var isCurved: Bool {
@@ -65,7 +73,8 @@ struct Annotation {
         case let .line(a, b), let .arrow(a, b):
             let points = isCurved ? Self.curvePoints(a, b) : [a, b]
             let xs = points.map(\.x), ys = points.map(\.y)
-            return NSRect(x: xs.min()!, y: ys.min()!, width: xs.max()! - xs.min()!, height: ys.max()! - ys.min()!)
+            let minX = xs.min() ?? 0, maxX = xs.max() ?? 0, minY = ys.min() ?? 0, maxY = ys.max() ?? 0
+            return NSRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
                 .insetBy(dx: -width * 2, dy: -width * 2)
         case let .text(p, string):
             let size = (string as NSString).size(withAttributes: [.font: textFont])
@@ -371,10 +380,11 @@ final class AnnotationRenderer {
             // The head follows the curve's direction where it arrives.
             let end = filledHead(at: to, angle: atan2(to.y - control.y, to.x - control.x))
             shaft.move(to: from)
-            shaft.curve(to: end, controlPoint1: NSPoint(x: from.x + (control.x - from.x) * 2 / 3,
-                                                        y: from.y + (control.y - from.y) * 2 / 3),
-                        controlPoint2: NSPoint(x: end.x + (control.x - end.x) * 2 / 3,
-                                               y: end.y + (control.y - end.y) * 2 / 3))
+            // A quadratic curve written as a cubic one: each control point is 2/3 of the way to the bend.
+            func toward(_ p: NSPoint) -> NSPoint {
+                NSPoint(x: p.x + (control.x - p.x) * 2 / 3, y: p.y + (control.y - p.y) * 2 / 3)
+            }
+            shaft.curve(to: end, controlPoint1: toward(from), controlPoint2: toward(end))
         }
         shaft.stroke()
     }
