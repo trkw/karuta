@@ -118,14 +118,20 @@ final class ScrollCapture {
 /// Joins frames of the same size, top to bottom. Each frame's rows are hashed; the scroll distance is the
 /// shift that lines the most rows up with the previous frame. Only new rows are kept (copied out), so
 /// memory grows with the result, not with the number of frames.
+///
+/// Columns that didn't change between two frames (a fixed sidebar beside the page) are left out of the
+/// hashes, and so is the right edge, where an overlay scroll bar appears while scrolling: only the part
+/// that moves is matched.
 struct Stitcher {
     private struct Frame {
         let image: CGImage
-        let rows: [UInt64]
+        let pixels: [UInt32] // top row first
     }
 
     /// A tall page is cut off here (pixels), to keep the image manageable.
     static let maxHeight = 32000
+    /// Pixels at the right edge never matched: the scroll bar fades in and moves while scrolling.
+    static let scrollBarWidth = 24
 
     private var previous: Frame?
     /// Kept rows, top to bottom; the last frame's bottom band (a sticky footer) goes after them.
@@ -139,8 +145,8 @@ struct Stitcher {
 
     /// Returns whether the frame added anything.
     mutating func add(_ image: CGImage) -> Bool {
-        guard let rows = Self.rowHashes(image) else { return false }
-        let frame = Frame(image: image, rows: rows)
+        guard let pixels = Self.pixels(image) else { return false }
+        let frame = Frame(image: image, pixels: pixels)
         guard let previous else {
             self.previous = frame
             segments = [Self.copyRows(image, 0, image.height)].compactMap { $0 }
@@ -148,18 +154,20 @@ struct Stitcher {
             return true
         }
         guard image.width == previous.image.width, image.height == previous.image.height,
-              rows != previous.rows
+              let columns = Self.movingColumns(previous.pixels, pixels, width: image.width, height: image.height)
         else { return false }
+        let oldRows = Self.rowHashes(previous.pixels, width: image.width, columns: columns)
+        let rows = Self.rowHashes(pixels, width: image.width, columns: columns)
 
         // Bands that didn't move at all: sticky headers at the top, toolbars or footers at the bottom.
         let h = rows.count
         var top = 0
-        while top < h, rows[top] == previous.rows[top] { top += 1 }
+        while top < h, rows[top] == oldRows[top] { top += 1 }
         var bottom = 0
-        while bottom < h - top, rows[h - 1 - bottom] == previous.rows[h - 1 - bottom] { bottom += 1 }
+        while bottom < h - top, rows[h - 1 - bottom] == oldRows[h - 1 - bottom] { bottom += 1 }
         let lo = top, hi = h - bottom
         let span = hi - lo
-        guard span >= 24, let shift = Self.shift(previous.rows, rows, lo: lo, hi: hi) else {
+        guard span >= 24, let shift = Self.shift(oldRows, rows, lo: lo, hi: hi) else {
             // Scrolled back up, or the content changed: wait for a frame that continues the page.
             return false
         }
@@ -201,32 +209,53 @@ struct Stitcher {
         return best?.shift
     }
 
-    /// One hash per pixel row (every other pixel, all channels).
-    private static func rowHashes(_ image: CGImage) -> [UInt64]? {
+    /// The image as 32-bit pixels, top row first.
+    private static func pixels(_ image: CGImage) -> [UInt32]? {
         let width = image.width, height = image.height
-        let bytesPerRow = width * 4
-        var pixels = [UInt8](repeating: 0, count: bytesPerRow * height)
+        var pixels = [UInt32](repeating: 0, count: width * height)
         let drawn: Bool = pixels.withUnsafeMutableBytes { buffer in
             guard let context = CGContext(
-                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: bytesPerRow,
+                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
                 space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
             ) else { return false }
             context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
             return true
         }
-        guard drawn else { return nil }
-        // The bitmap's first row in memory is the image's top row.
+        return drawn ? pixels : nil
+    }
+
+    /// The columns to match: from the first to the last column that changed between the two frames,
+    /// leaving out unchanged ones at either side and the scroll bar at the right edge. Nil when nothing moved.
+    private static func movingColumns(_ old: [UInt32], _ new: [UInt32], width: Int, height: Int) -> Range<Int>? {
+        var changed = [Bool](repeating: false, count: width)
+        old.withUnsafeBufferPointer { a in
+            new.withUnsafeBufferPointer { b in
+                for y in 0 ..< height {
+                    let row = y * width
+                    for x in 0 ..< width where !changed[x] && a[row + x] != b[row + x] { changed[x] = true }
+                }
+            }
+        }
+        guard let first = changed.firstIndex(of: true), let last = changed.lastIndex(of: true) else { return nil }
+        // A narrow area is matched whole; otherwise a change in the scroll bar alone isn't a scroll.
+        guard width >= scrollBarWidth * 4 else { return first ..< last + 1 }
+        let end = min(last + 1, width - scrollBarWidth)
+        return first < end ? first ..< end : nil
+    }
+
+    /// One hash per pixel row, over `columns` (every other pixel).
+    private static func rowHashes(_ pixels: [UInt32], width: Int, columns: Range<Int>) -> [UInt64] {
+        let height = pixels.count / max(width, 1)
         var hashes = [UInt64](repeating: 0, count: height)
         pixels.withUnsafeBufferPointer { p in
             for y in 0 ..< height {
                 var hash: UInt64 = 0xcbf2_9ce4_8422_2325
-                var i = y * bytesPerRow
-                let end = i + bytesPerRow
+                var i = y * width + columns.lowerBound
+                let end = y * width + columns.upperBound
                 while i < end {
-                    let pixel = UInt64(p[i]) | UInt64(p[i + 1]) << 8 | UInt64(p[i + 2]) << 16
-                    hash = (hash ^ pixel) &* 0x0000_0100_0000_01b3
-                    i += 8
+                    hash = (hash ^ UInt64(p[i] & 0x00ff_ffff)) &* 0x0000_0100_0000_01b3
+                    i += 2
                 }
                 hashes[y] = hash
             }
