@@ -212,7 +212,7 @@ final class AnnotationRenderer {
         return result
     }
 
-    static func bitmap(width: Int, height: Int, space: CGColorSpace?) -> CGContext? {
+    nonisolated static func bitmap(width: Int, height: Int, space: CGColorSpace?) -> CGContext? {
         let colorSpace = space.flatMap { $0.supportsOutput ? $0 : nil } ?? CGColorSpace(name: CGColorSpace.sRGB)!
         return CGContext(
             data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
