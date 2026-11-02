@@ -75,7 +75,7 @@ private final class SettingsWindow: NSWindow {
 // MARK: - Pages
 
 enum SettingsPage: CaseIterable {
-    case general, shortcuts, quickAccess, screenshots, about
+    case general, shortcuts, quickAccess, screenshots, recording, about
 
     var title: String {
         switch self {
@@ -83,6 +83,7 @@ enum SettingsPage: CaseIterable {
         case .shortcuts: "ショートカット"
         case .quickAccess: "クイックアクセス"
         case .screenshots: "スクリーンショット"
+        case .recording: "画面収録"
         case .about: "Karuta について"
         }
     }
@@ -93,6 +94,7 @@ enum SettingsPage: CaseIterable {
         case .shortcuts: "command"
         case .quickAccess: "rectangle.stack.fill"
         case .screenshots: "camera.fill"
+        case .recording: "record.circle"
         case .about: "info"
         }
     }
@@ -102,6 +104,7 @@ enum SettingsPage: CaseIterable {
         case .general, .shortcuts, .about: .systemGray
         case .quickAccess: .systemGreen
         case .screenshots: .systemBlue
+        case .recording: .systemRed
         }
     }
 }
@@ -248,6 +251,7 @@ private struct PageBuilder {
         case .shortcuts: views += shortcuts()
         case .quickAccess: views += quickAccess()
         case .screenshots: views += screenshots()
+        case .recording: views += recording()
         case .about: views += about()
         }
 
@@ -462,6 +466,51 @@ private struct PageBuilder {
                 row("撮るまでの時間", control: timer),
                 noteRow("範囲を選んでから撮るまで待ちます。メニューを開いた状態などを撮るときに使います。"),
             ]),
+        ]
+    }
+
+    private func recording() -> [NSView] {
+        let formats = Preferences.RecordingFormat.allCases
+        let format = NSSegmentedControl(labels: formats.map(\.title), trackingMode: .selectOne, target: nil, action: nil)
+        format.selectedSegment = formats.firstIndex(of: Preferences.recordingFormat) ?? 0
+        ClosureTarget { sender in
+            guard let control = sender as? NSSegmentedControl else { return }
+            Preferences.recordingFormat = formats[control.selectedSegment]
+        }.attach(to: format)
+        let rates = [30, 60]
+        let rate = NSSegmentedControl(labels: rates.map { "\($0) fps" }, trackingMode: .selectOne, target: nil, action: nil)
+        rate.selectedSegment = rates.firstIndex(of: Preferences.recordingFrameRate) ?? 0
+        ClosureTarget { sender in
+            guard let control = sender as? NSSegmentedControl else { return }
+            Preferences.recordingFrameRate = rates[control.selectedSegment]
+        }.attach(to: rate)
+        let countdowns = [0, 3, 5]
+        let countdown = NSPopUpButton(frame: .zero, pullsDown: false)
+        countdown.addItems(withTitles: countdowns.map { $0 == 0 ? "なし" : "\($0) 秒" })
+        countdown.selectItem(at: countdowns.firstIndex(of: Preferences.recordingCountdown) ?? 1)
+        ClosureTarget { sender in
+            guard let popup = sender as? NSPopUpButton else { return }
+            Preferences.recordingCountdown = countdowns[popup.indexOfSelectedItem]
+        }.attach(to: countdown)
+
+        var recordingRows: [NSView] = [
+            row("形式", control: format),
+            noteRow("GIF は 15 fps・幅 960 ピクセルまでに縮めて、音なしで書き出します。"),
+            row("フレームレート", control: rate),
+            row("始まるまでのカウントダウン", control: countdown),
+        ]
+        if #available(macOS 15.0, *) {
+            recordingRows.append(switchRow("クリックを表示", Preferences.showClicks,
+                                           note: "クリックした位置に輪が出ます。") { Preferences.showClicks = $0 })
+        }
+        var audioRows: [NSView] = [
+            switchRow("Mac の音を収録", Preferences.recordSystemAudio,
+                      note: "アプリや動画の音です。Karuta 自身の音は入りません。") { Preferences.recordSystemAudio = $0 },
+        ]
+        audioRows.append(noteRow("音は MP4 のときだけ入ります。"))
+        return [
+            section("収録", rows: recordingRows),
+            section("音声", rows: audioRows),
         ]
     }
 

@@ -408,6 +408,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let started: Date
         let screen: NSScreen
         let app: String?
+        let format: Preferences.RecordingFormat
         let outline: RecordingFrame?
         let timer: Timer
     }
@@ -420,7 +421,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Stops the recording that's running, or starts one: on `area`, or on an area or window chosen like a
-    /// screenshot. A 3-second countdown comes first; the menu bar item then shows the time and stops it.
+    /// screenshot. The countdown from Settings comes first; the menu bar item then shows the time and stops it.
     private func toggleRecording(area: (CGRect, NSScreen)? = nil) {
         if recording != nil {
             stopRecording()
@@ -448,6 +449,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
                 let config = SCStreamConfiguration()
                 config.showsCursor = true
+                if #available(macOS 15.0, *) { config.showMouseClicks = Preferences.showClicks }
+                let format = Preferences.recordingFormat
                 let filter: SCContentFilter
                 let frame: NSRect
                 let screen: NSScreen
@@ -472,13 +475,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         ?? NSScreen.underMouse
                 }
 
-                guard await SelfTimer.countdown(3, over: frame) else { return }
+                let countdown = Preferences.recordingCountdown
+                if countdown > 0 {
+                    guard await SelfTimer.countdown(countdown, over: frame) else { return }
+                }
                 let recorder = ScreenRecorder(url: Exporter.temporaryRecordingURL(app: app))
                 recorder.onStop = { [weak self] error in
                     NSLog("Karuta: recording stopped: \(error)")
                     MainActor.assumeIsolated { self?.stopRecording() }
                 }
-                try await recorder.start(filter: filter, configuration: config)
+                try await recorder.start(filter: filter, configuration: config, frameRate: Preferences.recordingFrameRate,
+                                         audio: format == .mp4 && Preferences.recordSystemAudio)
 
                 var outline: RecordingFrame?
                 if case .area = source {
@@ -490,7 +497,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     MainActor.assumeIsolated { self?.showRecordingStatus(since: started) }
                 }
                 self.recording = Recording(recorder: recorder, started: started, screen: screen, app: app,
-                                           outline: outline, timer: timer)
+                                           format: format, outline: outline, timer: timer)
                 self.showRecordingStatus(since: started)
             } catch {
                 NSLog("Karuta: recording failed: \(error)")
@@ -511,9 +518,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         showIdleStatusItem()
         Task {
             do {
-                let url = try await current.recorder.stop()
+                var url = try await current.recorder.stop()
                 if Preferences.playSound { Sounds.shutter()?.play() }
-                guard let thumbnail = await ScreenRecorder.thumbnail(of: url) else {
+                let thumbnail = await ScreenRecorder.thumbnail(of: url)
+                if current.format == .gif { url = try await ScreenRecorder.makeGIF(from: url) }
+                guard let thumbnail else {
                     // Can't preview it: keep the file and show it.
                     let saved = try Exporter.save(Shot(image: Self.blankImage, scale: 1, app: current.app, video: url))
                     NSWorkspace.shared.activateFileViewerSelecting([saved])

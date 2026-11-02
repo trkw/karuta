@@ -242,6 +242,42 @@ enum Preferences {
         }
     }
 
+    // MARK: Recording
+
+    enum RecordingFormat: String, CaseIterable {
+        case mp4, gif
+
+        var title: String { rawValue.uppercased() }
+    }
+
+    static var recordingFormat: RecordingFormat {
+        get { defaults.string(forKey: "recordingFormat").flatMap(RecordingFormat.init(rawValue:)) ?? .mp4 }
+        set { set(newValue.rawValue, for: "recordingFormat") }
+    }
+
+    /// Seconds of countdown before a recording starts (0: none).
+    static var recordingCountdown: Int {
+        get { defaults.object(forKey: "recordingCountdown") == nil ? 3 : defaults.integer(forKey: "recordingCountdown") }
+        set { set(newValue, for: "recordingCountdown") }
+    }
+
+    static var recordingFrameRate: Int {
+        get { defaults.integer(forKey: "recordingFrameRate") == 60 ? 60 : 30 }
+        set { set(newValue, for: "recordingFrameRate") }
+    }
+
+    /// The Mac's own sound (apps, videos), MP4 only.
+    static var recordSystemAudio: Bool {
+        get { bool("recordSystemAudio", default: false) }
+        set { set(newValue, for: "recordSystemAudio") }
+    }
+
+    /// Rings around clicks in recordings (macOS 15 and later).
+    static var showClicks: Bool {
+        get { bool("showClicks", default: false) }
+        set { set(newValue, for: "showClicks") }
+    }
+
     /// Colors kept in the editor's color menu (most recent first).
     static var savedColors: [NSColor] {
         get { (defaults.stringArray(forKey: "savedColors") ?? []).compactMap(color(hex:)) }

@@ -1,6 +1,8 @@
 import AppKit
 import AVFoundation
+import ImageIO
 import ScreenCaptureKit
+import UniformTypeIdentifiers
 
 /// Screen recording to an MP4 (H.264): ScreenCaptureKit frames go straight into an AVAssetWriter.
 /// Frames arrive on a private queue; start and stop are called from the main actor.
@@ -19,6 +21,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
     private var stream: SCStream?
     private var writer: AVAssetWriter?
     private var input: AVAssetWriterInput?
+    private var audioInput: AVAssetWriterInput?
     private var sessionStarted = false
     private var finished = false
 
@@ -36,8 +39,10 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
         return (max(2, Int(width) / 2 * 2), max(2, Int(height) / 2 * 2))
     }
 
-    func start(filter: SCContentFilter, configuration config: SCStreamConfiguration) async throws {
-        config.minimumFrameInterval = CMTime(value: 1, timescale: 30)
+    /// `audio` adds the Mac's own sound (apps and videos, not Karuta) as an AAC track.
+    func start(filter: SCContentFilter, configuration config: SCStreamConfiguration, frameRate: Int,
+               audio: Bool) async throws {
+        config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(frameRate))
         config.queueDepth = 6
         config.pixelFormat = kCVPixelFormatType_32BGRA
 
@@ -49,26 +54,51 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
             AVVideoHeightKey: config.height,
             AVVideoCompressionPropertiesKey: [
                 // About 0.1 bit per pixel at 30 fps: sharp text, reasonable files.
-                AVVideoAverageBitRateKey: max(2_000_000, config.width * config.height * 3),
-                AVVideoExpectedSourceFrameRateKey: 30,
-                AVVideoMaxKeyFrameIntervalKey: 60,
+                AVVideoAverageBitRateKey: max(2_000_000, config.width * config.height * 3 * frameRate / 30),
+                AVVideoExpectedSourceFrameRateKey: frameRate,
+                AVVideoMaxKeyFrameIntervalKey: frameRate * 2,
                 AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
             ] as [String: Any],
         ])
         input.expectsMediaDataInRealTime = true
         guard writer.canAdd(input) else { throw writer.error ?? CocoaError(.fileWriteUnknown) }
         writer.add(input)
+        if audio {
+            config.capturesAudio = true
+            config.excludesCurrentProcessAudio = true
+            config.sampleRate = 48000
+            config.channelCount = 2
+            let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+                AVFormatIDKey: kAudioFormatMPEG4AAC,
+                AVSampleRateKey: 48000,
+                AVNumberOfChannelsKey: 2,
+                AVEncoderBitRateKey: 160_000,
+            ])
+            audioInput.expectsMediaDataInRealTime = true
+            if writer.canAdd(audioInput) {
+                writer.add(audioInput)
+                self.audioInput = audioInput
+            }
+        }
         guard writer.startWriting() else { throw writer.error ?? CocoaError(.fileWriteUnknown) }
         self.writer = writer
         self.input = input
 
         let stream = SCStream(filter: filter, configuration: config, delegate: self)
         try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
+        if audioInput != nil { try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue) }
         try await stream.startCapture()
         self.stream = stream
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
+        if type == .audio {
+            // Sound starts with the first picture, so the two tracks line up.
+            guard !finished, sessionStarted, sampleBuffer.isValid, let audioInput, audioInput.isReadyForMoreMediaData
+            else { return }
+            audioInput.append(sampleBuffer)
+            return
+        }
         // Only complete frames carry an image; idle ones just say nothing changed.
         guard type == .screen, !finished, sampleBuffer.isValid,
               let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false)
@@ -103,6 +133,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
                     return
                 }
                 input.markAsFinished()
+                audioInput?.markAsFinished()
                 writer.endSession(atSourceTime: end)
                 writer.finishWriting { continuation.resume(returning: writer.status == .completed) }
             }
@@ -112,6 +143,52 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
             throw writer?.error ?? RecorderError.noFrames
         }
         return url
+    }
+
+    /// Turns a recording into a looping GIF (15 fps, at most 960 pixels wide, two minutes at most) and
+    /// removes the MP4.
+    static func makeGIF(from movie: URL) async throws -> URL {
+        let asset = AVURLAsset(url: movie)
+        let duration = try await asset.load(.duration).seconds
+        let fps = 15.0
+        let count = max(1, min(Int(duration * fps), Int(120 * fps)))
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 960, height: 4000)
+        let tolerance = CMTime(seconds: 0.5 / fps, preferredTimescale: 600)
+        generator.requestedTimeToleranceBefore = tolerance
+        generator.requestedTimeToleranceAfter = tolerance
+
+        // Never replace an earlier GIF: a Quick Access card or the clipboard may still point at it.
+        let base = movie.deletingPathExtension()
+        var gif = base.appendingPathExtension("gif")
+        var n = 2
+        while FileManager.default.fileExists(atPath: gif.path) {
+            gif = base.deletingLastPathComponent()
+                .appendingPathComponent("\(base.lastPathComponent) (\(n)).gif")
+            n += 1
+        }
+        guard let destination = CGImageDestinationCreateWithURL(gif as CFURL, UTType.gif.identifier as CFString, count, nil)
+        else { throw CocoaError(.fileWriteUnknown) }
+        let loop = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]]
+        CGImageDestinationSetProperties(destination, loop as CFDictionary)
+        let delay = [kCGImagePropertyGIFDictionary: [
+            kCGImagePropertyGIFDelayTime: 1 / fps, kCGImagePropertyGIFUnclampedDelayTime: 1 / fps,
+        ]]
+        let times = (0 ..< count).map { CMTime(seconds: Double($0) / fps, preferredTimescale: 600) }
+        var added = 0
+        for await result in generator.images(for: times) {
+            // A frame that can't be read (e.g. past the end) is skipped; the rest keep their timing.
+            guard let image = try? result.image else { continue }
+            CGImageDestinationAddImage(destination, image, delay as CFDictionary)
+            added += 1
+        }
+        guard added > 0, CGImageDestinationFinalize(destination) else {
+            try? FileManager.default.removeItem(at: gif)
+            throw RecorderError.noFrames
+        }
+        try? FileManager.default.removeItem(at: movie)
+        return gif
     }
 
     /// The first frame, for the Quick Access card.
