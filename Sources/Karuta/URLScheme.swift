@@ -20,6 +20,7 @@ enum URLCommand {
     case shortcut(ShortcutAction)
     /// Starts a recording (on the area, if given) or stops the one running.
     case record((CGRect, NSScreen)?)
+    case scroll((CGRect, NSScreen)?, autoScroll: Bool)
 
     @MainActor
     init?(_ url: URL) {
@@ -49,6 +50,8 @@ enum URLCommand {
         case "self-timer": self = .capture(.selfTimer, delivery)
         case "all-in-one": self = .allInOne(initial: Self.area(query)?.0)
         case "record-screen": self = .record(Self.area(query))
+        case "scrolling-capture":
+            self = .scroll(Self.area(query), autoScroll: query["autoscroll"]?.lowercased() == "true")
         case "pin": self = .pin(file)
         case "open-annotate": self = .annotate(file)
         case "open-from-clipboard": self = .openClipboard
