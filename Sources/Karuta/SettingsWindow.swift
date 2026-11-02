@@ -359,6 +359,24 @@ private struct PageBuilder {
             guard let popup = sender as? NSPopUpButton else { return }
             Preferences.autoBackdrop = Preferences.AutoBackdrop.allCases[popup.indexOfSelectedItem]
         }.attach(to: backdrop)
+        let aspects = Preferences.SelectionAspect.allCases
+        let aspect = NSPopUpButton(frame: .zero, pullsDown: false)
+        aspect.addItems(withTitles: aspects.map(\.title))
+        aspect.selectItem(at: aspects.firstIndex(of: Preferences.selectionAspect) ?? 0)
+        ClosureTarget { sender in
+            guard let popup = sender as? NSPopUpButton else { return }
+            Preferences.selectionAspect = aspects[popup.indexOfSelectedItem]
+        }.attach(to: aspect)
+        let fixedSize = NSTextField(string: Preferences.fixedSelectionSize.map { "\(Int($0.width))x\(Int($0.height))" } ?? "")
+        fixedSize.placeholderString = "例: 1280x720"
+        fixedSize.cell?.sendsActionOnEndEditing = true
+        fixedSize.widthAnchor.constraint(equalToConstant: 120).isActive = true
+        ClosureTarget { sender in
+            guard let field = sender as? NSTextField else { return }
+            let size = Preferences.parseSize(field.stringValue)
+            Preferences.fixedSelectionSize = size
+            field.stringValue = size.map { "\(Int($0.width))x\(Int($0.height))" } ?? ""
+        }.attach(to: fixedSize)
         let timerChoices = [3, 5, 10]
         let timer = NSPopUpButton(frame: .zero, pullsDown: false)
         timer.addItems(withTitles: timerChoices.map { "\($0) 秒" })
@@ -388,6 +406,10 @@ private struct PageBuilder {
                           note: "動画やメニューが動いていても、選び始めた瞬間の画面を撮ります。") { Preferences.freezeScreen = $0 },
                 switchRow("拡大鏡を表示", Preferences.showLoupe,
                           note: "画面を止めているときに使えます。") { Preferences.showLoupe = $0 },
+                row("縦横比", control: aspect),
+                noteRow("選んでいる間も A キーで切り替えられます。"),
+                row("決まったサイズ", control: fixedSize),
+                noteRow("幅x高さ（pt）。選んでいる間に F キーでこのサイズの枠に切り替え、クリックで撮影します。"),
             ]),
             section("セルフタイマー", rows: [
                 row("撮るまでの時間", control: timer),

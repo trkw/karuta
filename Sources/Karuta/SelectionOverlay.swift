@@ -7,6 +7,7 @@ import AppKit
 /// - Drag: select an area. Shift = square, Option = from the center, hold Space = move the selection.
 /// - Arrow keys: move the cursor by 1pt (Shift: 10pt), also while dragging.
 /// - Space (not dragging): switch between area and window selection. Click / Return: capture the window.
+/// - A: cycle the aspect ratio lock. F: switch to a frame of the fixed size (Settings), captured by a click / Return.
 /// - Esc / right click: cancel.
 ///
 /// All-In-One (CleanShot's mode of the same name): the area stays on screen after the drag, with handles to
@@ -34,6 +35,9 @@ final class SelectionController {
     private(set) var hovered: SCWindow?
     /// The cursor position in AppKit global coordinates.
     private(set) var mouse = NSPoint.zero
+    private(set) var aspect = Preferences.selectionAspect
+    /// The fixed-size frame that follows the cursor, while F has it on.
+    private(set) var fixedSize: CGSize?
 
     private var candidates: [SCWindow] = []
     private var windows: [SelectionWindow] = []
@@ -47,6 +51,7 @@ final class SelectionController {
         self.windowMode = windowMode
         self.allInOne = allInOne
         self.candidates = candidates
+        fixedSize = nil
         action = .capture
         previousApp = NSWorkspace.shared.frontmostApplication
 
@@ -76,6 +81,20 @@ final class SelectionController {
         windowMode.toggle()
         updateHover()
         windows.forEach { $0.selectionView.modeChanged() }
+        redrawAll()
+    }
+
+    /// Remembered for the next selection, like the setting.
+    func cycleAspect() {
+        let all = Preferences.SelectionAspect.allCases
+        aspect = all[(all.firstIndex(of: aspect)! + 1) % all.count]
+        Preferences.selectionAspect = aspect
+        redrawAll()
+    }
+
+    func toggleFixedSize() {
+        fixedSize = fixedSize == nil ? Preferences.fixedSelectionSize : nil
+        if fixedSize != nil, windowMode { toggleMode() }
         redrawAll()
     }
 
@@ -187,20 +206,35 @@ private final class SelectionView: NSView {
         guard let anchor, let current else { return nil }
         var dx = current.x - anchor.x
         var dy = current.y - anchor.y
-        if let ratio = modifiers.contains(.shift) ? 1 : activeAspect {
-            // Grow the shorter side to the ratio (Shift is 1:1).
-            var width = abs(dx), height = abs(dy)
-            if width / max(height, 1) > ratio { height = width / ratio } else { width = height * ratio }
+        let ratio: CGFloat? = modifiers.contains(.shift) ? 1 : (controller.allInOne ? activeAspect : controller.aspect.ratio)
+        if let ratio {
+            var width = max(abs(dx), abs(dy) * ratio)
+            // Shrink rather than clip at the screen edges, so the ratio holds.
+            let room = modifiers.contains(.option)
+                ? (x: min(anchor.x - bounds.minX, bounds.maxX - anchor.x), y: min(anchor.y - bounds.minY, bounds.maxY - anchor.y))
+                : (x: dx < 0 ? anchor.x - bounds.minX : bounds.maxX - anchor.x,
+                   y: dy < 0 ? anchor.y - bounds.minY : bounds.maxY - anchor.y)
+            width = min(width, room.x, room.y * ratio)
             dx = dx < 0 ? -width : width
-            dy = dy < 0 ? -height : height
+            dy = dy < 0 ? -width / ratio : width / ratio
         }
         return modifiers.contains(.option)
             ? NSRect(x: anchor.x - abs(dx), y: anchor.y - abs(dy), width: abs(dx) * 2, height: abs(dy) * 2)
             : NSRect(x: min(anchor.x, anchor.x + dx), y: min(anchor.y, anchor.y + dy), width: abs(dx), height: abs(dy))
     }
 
+    /// The fixed-size frame centered on the cursor, kept inside the screen.
+    private var fixedSelection: NSRect? {
+        guard let size = controller.fixedSize, let mouse = localMouse else { return nil }
+        let width = min(size.width, bounds.width), height = min(size.height, bounds.height)
+        let x = min(max((mouse.x - width / 2).rounded(), bounds.minX), bounds.maxX - width)
+        let y = min(max((mouse.y - height / 2).rounded(), bounds.minY), bounds.maxY - height)
+        return NSRect(x: x, y: y, width: width, height: height)
+    }
+
     /// The selection in view coordinates, clipped to the screen and snapped to points.
     private var selection: NSRect? {
+        if adjusted == nil, controller.fixedSize != nil, !controller.windowMode { return fixedSelection }
         guard let rect = adjusted ?? rawSelection else { return nil }
         let clipped = rect.intersection(bounds)
         guard !clipped.isNull else { return nil }
@@ -275,6 +309,7 @@ private final class SelectionView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        if controller.fixedSize != nil, !controller.windowMode { return }
         let point = clamped(convert(event.locationInWindow, from: nil))
         modifiers = event.modifierFlags
         if let adjusted {
@@ -324,6 +359,10 @@ private final class SelectionView: NSView {
             adjusting = nil
             return
         }
+        if controller.fixedSize != nil, !controller.windowMode {
+            captureFixedSelection()
+            return
+        }
         let rect = selection
         anchor = nil
         current = nil
@@ -338,6 +377,11 @@ private final class SelectionView: NSView {
         } else {
             needsDisplay = true
         }
+    }
+
+    private func captureFixedSelection() {
+        guard let rect = fixedSelection else { return }
+        controller.finish(.area(rect.offsetBy(dx: screen.frame.minX, dy: screen.frame.minY), screen))
     }
 
     override func rightMouseDown(with event: NSEvent) {
@@ -366,7 +410,13 @@ private final class SelectionView: NSView {
         case 36, 76: // Return / Enter
             if controller.windowMode, let window = controller.hovered {
                 controller.finish(.window(window))
+            } else if controller.fixedSize != nil, localMouse != nil {
+                captureFixedSelection()
             }
+        case 0 where !isDragging && !controller.allInOne: // A
+            controller.cycleAspect()
+        case 3 where !isDragging && !controller.allInOne && Preferences.fixedSelectionSize != nil: // F
+            controller.toggleFixedSize()
         case 123, 124, 125, 126: // ← → ↓ ↑
             nudge(keyCode: event.keyCode, step: event.modifierFlags.contains(.shift) ? 10 : 1)
         default:
@@ -575,10 +625,14 @@ private final class SelectionView: NSView {
             if let adjusting, !adjusting.handle.isMove { drawLoupe(at: mouse) }
             return
         }
-        if !isDragging { drawGuides(at: mouse) }
+        let fixed = controller.fixedSize != nil
+        if !isDragging, !fixed { drawGuides(at: mouse) }
         drawLoupe(at: mouse)
+        let ratio = controller.aspect == .free || fixed ? "" : controller.aspect.title
         if let rect = selection {
-            drawPill("\(Int(rect.width)) × \(Int(rect.height))", near: mouse)
+            drawPill("\(Int(rect.width)) × \(Int(rect.height))" + (ratio.isEmpty ? "" : "  \(ratio)"), near: mouse)
+        } else if !ratio.isEmpty {
+            drawPill(ratio, near: mouse)
         }
     }
 
