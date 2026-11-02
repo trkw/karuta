@@ -178,10 +178,10 @@ final class QuickOverlay {
     /// no longer fits below that screen's top edge.
     private func stack() -> (y: [ObjectIdentifier: CGFloat], overflow: OverlayCard?) {
         var y: [ObjectIdentifier: CGFloat] = [:]
-        var nextY: [CGFloat: CGFloat] = [:] // per screen and side, the next free y
+        var nextY: [String: CGFloat] = [:] // per screen and side, the next free y
         var overflow: OverlayCard?
         for card in cards {
-            let key = (card.screenFrame.minX * 100_000 + card.screenFrame.minY) * (card.onRight ? -1 : 1)
+            let key = "\(card.screenFrame.minX),\(card.screenFrame.minY),\(card.onRight)"
             let base = nextY[key] ?? card.screenFrame.minY + Self.margin
             y[ObjectIdentifier(card)] = base
             nextY[key] = base + card.frame.height + Self.spacing

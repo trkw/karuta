@@ -44,10 +44,17 @@ final class PinWindow: NSPanel {
     var isLocked: Bool {
         get { ignoresMouseEvents }
         set {
+            guard newValue != ignoresMouseEvents else { return }
             ignoresMouseEvents = newValue
-            // A hint that it no longer reacts: a little see-through while locked.
-            alphaValue = newValue ? min(alphaValue, 0.85) : max(alphaValue, 0.85)
+            applyOpacity()
         }
+    }
+
+    /// The opacity chosen with ⌥-scroll; while locked it's shown a little see-through as a hint.
+    private var opacity: CGFloat = 1
+
+    private func applyOpacity() {
+        alphaValue = isLocked ? min(opacity, 0.85) : opacity
     }
 
     private func contextMenu() -> NSMenu {
@@ -86,7 +93,8 @@ final class PinWindow: NSPanel {
     override func scrollWheel(with event: NSEvent) {
         let delta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.scrollingDeltaY * 8
         if event.modifierFlags.contains(.option) {
-            alphaValue = min(1, max(0.2, alphaValue + delta / 200))
+            opacity = min(1, max(0.2, opacity + delta / 200))
+            applyOpacity()
             return
         }
         let width = min(max(frame.width * (1 + delta / 300), 60), 4000)
