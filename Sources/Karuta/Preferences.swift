@@ -111,6 +111,12 @@ enum Preferences {
         set { set(newValue, for: "fileNameTemplate") }
     }
 
+    /// Days captures stay in the capture history; 0 turns it off.
+    static var historyDays: Int {
+        get { defaults.object(forKey: "historyDays") == nil ? 7 : defaults.integer(forKey: "historyDays") }
+        set { set(newValue, for: "historyDays") }
+    }
+
     /// Seconds the self-timer counts down before taking the shot.
     static var selfTimerSeconds: Int {
         get { defaults.object(forKey: "selfTimerSeconds") == nil ? 5 : defaults.integer(forKey: "selfTimerSeconds") }
@@ -278,7 +284,7 @@ enum Preferences {
 enum ShortcutAction: String, CaseIterable {
     case allInOne, area, window, fullscreen, previousArea, selfTimer
     case areaCopy, areaSave, areaAnnotate, areaPin
-    case openClipboard, openFile, pinFile, restoreClosed
+    case openClipboard, openFile, pinFile, restoreClosed, openHistory
     case toggleOverlays, saveAllOverlays, closeAllOverlays
 
     var title: String {
@@ -297,6 +303,7 @@ enum ShortcutAction: String, CaseIterable {
         case .openFile: "画像を開いて編集…"
         case .pinFile: "画像をピン留め…"
         case .restoreClosed: "最近閉じたものを戻す"
+        case .openHistory: "撮影履歴…"
         case .toggleOverlays: "オーバーレイを隠す / 表示"
         case .saveAllOverlays: "オーバーレイをすべて保存"
         case .closeAllOverlays: "オーバーレイをすべて閉じる"
@@ -313,7 +320,7 @@ enum ShortcutAction: String, CaseIterable {
         case .allInOne, .area, .window, .fullscreen, .previousArea, .selfTimer,
              .areaCopy, .areaSave, .areaAnnotate, .areaPin:
             .screenshots
-        case .openClipboard, .openFile, .pinFile, .restoreClosed: .general
+        case .openClipboard, .openFile, .pinFile, .restoreClosed, .openHistory: .general
         case .toggleOverlays, .saveAllOverlays, .closeAllOverlays: .overlay
         }
     }

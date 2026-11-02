@@ -21,10 +21,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastArea: (rect: CGRect, displayID: CGDirectDisplayID)?
     private var isCapturing = false
     private var settings: SettingsWindowController?
+    private var history: HistoryWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setUpStatusItem()
         registerHotKeys()
+        CaptureHistory.prune()
         NotificationCenter.default.addObserver(forName: Preferences.didChange, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.registerHotKeys()
@@ -60,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         let groups: [[ShortcutAction]] = [
             [.allInOne, .area, .window, .fullscreen, .previousArea, .selfTimer],
-            [.openClipboard, .openFile, .pinFile, .restoreClosed],
+            [.openClipboard, .openFile, .pinFile, .restoreClosed, .openHistory],
         ]
         for group in groups {
             for action in group {
@@ -120,10 +122,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let shot = ImageLoader.chooseImage(prompt: "ピン留め") { pin(shot, near: NSScreen.underMouse.visibleFrame) }
         case .restoreClosed:
             if !overlay.restoreClosed(on: NSScreen.underMouse) { NSSound.beep() }
+        case .openHistory: openHistory()
         case .toggleOverlays: overlay.toggleHidden()
         case .saveAllOverlays: overlay.saveAll()
         case .closeAllOverlays: overlay.closeAll()
         }
+    }
+
+    private func openHistory() {
+        if history == nil {
+            let controller = HistoryWindowController()
+            controller.onEdit = { [weak self] shot in self?.openEditor(shot) }
+            controller.onPin = { [weak self] shot in self?.pin(shot, near: NSScreen.underMouse.visibleFrame) }
+            controller.onOverlay = { [weak self] shot in self?.overlay.show(shot, on: NSScreen.underMouse) }
+            controller.onClose = { [weak self] in self?.history = nil }
+            history = controller
+        }
+        NSApp.activate()
+        history?.showWindow(nil)
+        history?.window?.makeKeyAndOrderFront(nil)
     }
 
     @objc private func openSettings() {
@@ -235,7 +252,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
                 shot.app = app
-                self.deliver(shot, on: screen, frame: frame, isWindow: isWindow, delivery: delivery)
+                let kind: CaptureHistory.Kind = mode == .fullscreen ? .fullscreen : isWindow ? .window : .area
+                self.deliver(shot, on: screen, frame: frame, isWindow: isWindow, kind: kind, delivery: delivery)
             } catch {
                 NSLog("Karuta: capture failed: \(error)")
                 if !CGPreflightScreenCaptureAccess() { self.showPermissionAlert() }
@@ -244,7 +262,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// What happens after a capture, as chosen in Settings.
-    private func deliver(_ raw: Shot, on screen: NSScreen, frame: NSRect, isWindow: Bool, delivery: Delivery) {
+    private func deliver(_ raw: Shot, on screen: NSScreen, frame: NSRect, isWindow: Bool, kind: CaptureHistory.Kind,
+                         delivery: Delivery) {
         if Preferences.playSound { Sounds.shutter()?.play() }
         let backdrop = switch Preferences.autoBackdrop {
         case .off: false
@@ -253,6 +272,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // The editor gets the plain shot with the background switched on, so the backdrop stays adjustable.
         let shot = backdrop ? Backdrop.compose(raw) : raw
+        CaptureHistory.add(shot, kind: kind)
         switch delivery {
         case .settings:
             break
