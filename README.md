@@ -95,6 +95,30 @@
 - Done でクイックアクセスに戻す / Save as… で場所を選んで保存 / ⌘S で保存先に保存 / ⌘C でコピー
 - 下のバー: ズーム、左右に回転・左右 / 上下反転（注釈と切り抜きを焼き込んでから回します。⌘Z で戻せます）、「Drag Me」をドラッグしてファイルとして渡す、共有・ピン留め・コピー
 
+### URL スキーム
+
+`karuta://` の URL で、ショートカット.app・Raycast・Alfred・スクリプトなどから操作できます（CleanShot の URL スキームと同じ構成です）。
+
+```sh
+open "karuta://capture-area?action=copy"
+open "karuta://capture-area?x=0&y=0&width=800&height=600&display=1&action=save"
+open "karuta://pin?filepath=~/Desktop/image.png"
+```
+
+| コマンド | パラメータ |
+| --- | --- |
+| `capture-area` | `x` `y` `width` `height` `display`（4 つそろえると、その範囲を選ばずに撮影）、`action` |
+| `capture-previous-area` / `capture-fullscreen` / `capture-window` / `self-timer` | `action` |
+| `all-in-one` | `x` `y` `width` `height` `display`（始めの範囲） |
+| `pin` / `open-annotate` | `filepath`（なければファイルを選ぶ） |
+| `add-quick-access-overlay` | `filepath`（必須） |
+| `open-from-clipboard` / `open-history` / `restore-recently-closed` | なし |
+| `open-settings` | `tab`（general / shortcuts / quickaccess / screenshots / about） |
+| `toggle-overlays` / `save-all-overlays` / `close-all-overlays` / `toggle-pins` / `unlock-pins` / `close-all-pins` | なし（Karuta 独自） |
+
+- `action`: `copy` / `save` / `annotate` / `pin`（省略時は「撮影後の動作」の設定どおり）
+- 座標はディスプレイの左下が (0, 0) のポイント単位。`display` は 1 がメイン、2 がその次（省略時はマウスのある画面）
+
 ## ビルド
 
 Xcode（またはコマンドラインツール）が入った Mac で:

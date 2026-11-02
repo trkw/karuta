@@ -2,8 +2,10 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    enum CaptureMode {
+    enum CaptureMode: Equatable {
         case allInOne, area, window, fullscreen, previousArea, selfTimer
+        /// A given area (AppKit global coordinates) on a screen, from the URL scheme.
+        case fixed(CGRect, NSScreen)
     }
 
     /// What to do with a shot: the After Capture settings, or one fixed action ("範囲を撮影してコピー" etc.).
@@ -38,6 +40,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overlay.onPin = { [weak self] shot, frame in self?.pin(shot, near: frame) }
         if !CGPreflightScreenCaptureAccess() {
             CGRequestScreenCaptureAccess()
+        }
+    }
+
+    /// `karuta://` URLs (see URLCommand).
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            guard let command = URLCommand(url) else {
+                NSLog("Karuta: unknown URL \(url.absoluteString)")
+                NSSound.beep()
+                continue
+            }
+            run(command)
+        }
+    }
+
+    private func run(_ command: URLCommand) {
+        switch command {
+        case let .capture(mode, delivery): capture(mode, delivery: delivery)
+        case let .captureRect(rect, screen, delivery): capture(.fixed(rect, screen), delivery: delivery)
+        case let .allInOne(initial): capture(.allInOne, initial: initial)
+        case let .pin(file):
+            if let file {
+                guard let shot = ImageLoader.shot(contentsOf: file) else { return NSSound.beep() }
+                pin(shot, near: NSScreen.underMouse.visibleFrame)
+            } else {
+                perform(.pinFile)
+            }
+        case let .annotate(file):
+            if let file {
+                guard let shot = ImageLoader.shot(contentsOf: file) else { return NSSound.beep() }
+                openEditor(shot)
+            } else {
+                perform(.openFile)
+            }
+        case .openClipboard: perform(.openClipboard)
+        case let .addOverlay(file):
+            guard let shot = ImageLoader.shot(contentsOf: file) else { return NSSound.beep() }
+            overlay.show(shot, on: NSScreen.underMouse)
+        case .openHistory: perform(.openHistory)
+        case .restoreClosed: perform(.restoreClosed)
+        case let .openSettings(page): openSettings(page: page)
+        case let .shortcut(action): perform(action)
         }
     }
 
@@ -151,6 +195,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
+        openSettings(page: nil)
+    }
+
+    private func openSettings(page: SettingsPage?) {
         if settings == nil {
             let controller = SettingsWindowController()
             controller.onClose = { [weak self] in self?.settings = nil }
@@ -160,6 +208,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             settings = controller
         }
+        if let page { settings?.select(page) }
         NSApp.activate()
         settings?.showWindow(nil)
         settings?.window?.makeKeyAndOrderFront(nil)
@@ -167,7 +216,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Capture
 
-    private func capture(_ mode: CaptureMode, delivery: Delivery = .settings) {
+    /// `initial` overrides All-In-One's starting area (normally the previous one).
+    private func capture(_ mode: CaptureMode, delivery: Delivery = .settings, initial: CGRect? = nil) {
         guard !isCapturing else { return }
         isCapturing = true
         // Before the selection overlay brings Karuta forward: the app being captured, for the file name.
@@ -186,6 +236,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     screen = NSScreen.underMouse
                     frame = screen.frame
                     shot = try await Capturer.captureDisplay(of: screen, rect: nil, content: content)
+                case let .fixed(rect, fixedScreen):
+                    screen = fixedScreen
+                    frame = rect
+                    shot = try await Capturer.captureDisplay(of: screen, rect: rect, content: content)
                 case .previousArea:
                     guard let last = self.lastArea,
                           let lastScreen = NSScreen.screens.first(where: { $0.displayID == last.displayID })
@@ -209,14 +263,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     // The self-timer captures the live screen after the countdown, so it never freezes.
                     var frozen: [CGDirectDisplayID: Shot] = [:]
                     if Preferences.freezeScreen && !timed { frozen = await Capturer.freezeDisplays(content: content) }
-                    // All-In-One starts on the previous area, ready to adjust.
-                    let initial = mode == .allInOne ? self.lastArea.flatMap { last in
-                        NSScreen.screens.first { $0.displayID == last.displayID }
-                            .map { last.rect.offsetBy(dx: $0.frame.minX, dy: $0.frame.minY) }
-                    } : nil
+                    // All-In-One starts on the given area or the previous one, ready to adjust.
+                    var start: CGRect?
+                    if mode == .allInOne {
+                        start = initial ?? self.lastArea.flatMap { last in
+                            NSScreen.screens.first { $0.displayID == last.displayID }
+                                .map { last.rect.offsetBy(dx: $0.frame.minX, dy: $0.frame.minY) }
+                        }
+                    }
                     let result = await self.selection.run(windowMode: mode == .window, candidates: candidates,
                                                           frozen: frozen, allInOne: mode == .allInOne,
-                                                          initial: initial)
+                                                          initial: start)
                     if mode == .allInOne {
                         switch self.selection.action {
                         case .capture: break
