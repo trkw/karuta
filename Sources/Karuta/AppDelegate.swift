@@ -455,7 +455,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case let .area(rect, areaScreen):
                     guard let id = areaScreen.displayID, let display = content.displays.first(where: { $0.displayID == id })
                     else { throw CaptureError.displayNotFound }
-                    filter = Capturer.displayFilter(for: display, content: content)
+                    filter = Capturer.recordingFilter(for: display, content: content)
                     config.sourceRect = Capturer.sourceRect(rect, on: areaScreen)
                     let size = ScreenRecorder.outputSize(points: rect.size, scale: areaScreen.backingScaleFactor)
                     config.width = size.width

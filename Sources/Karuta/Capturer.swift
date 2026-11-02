@@ -88,6 +88,15 @@ enum Capturer {
     }
 
     /// Everything on the display except Karuta itself, and (if chosen in Settings) Finder's desktop icons.
+    /// For a recording: Karuta is left out as an app, so windows it opens later (a Quick Access card, a
+    /// countdown) stay out too. Hiding desktop icons needs a window list, which would only cover the
+    /// windows open at the start, so recordings show them.
+    static func recordingFilter(for display: SCDisplay, content: SCShareableContent) -> SCContentFilter {
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let ownApps = content.applications.filter { $0.processID == pid }
+        return SCContentFilter(display: display, excludingApplications: ownApps, exceptingWindows: [])
+    }
+
     static func displayFilter(for display: SCDisplay, content: SCShareableContent) -> SCContentFilter {
         let pid = ProcessInfo.processInfo.processIdentifier
         let ownApps = content.applications.filter { $0.processID == pid }
