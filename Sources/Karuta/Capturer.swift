@@ -7,6 +7,8 @@ struct Shot {
     let image: CGImage
     let scale: CGFloat
     var app: String? = nil
+    /// A screen recording (MP4); `image` is then its first frame, for previews.
+    var video: URL? = nil
 }
 
 enum CaptureError: Error {
@@ -25,7 +27,7 @@ enum Capturer {
               let display = content.displays.first(where: { $0.displayID == id })
         else { throw CaptureError.displayNotFound }
 
-        let filter = filter(for: display, content: content)
+        let filter = displayFilter(for: display, content: content)
         let scale = screen.backingScaleFactor
 
         let config = SCStreamConfiguration()
@@ -46,6 +48,12 @@ enum Capturer {
 
         let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
         return Shot(image: image, scale: scale)
+    }
+
+    /// `rect` (AppKit global coordinates) as ScreenCaptureKit's sourceRect: points relative to the display,
+    /// with a top-left origin.
+    static func sourceRect(_ rect: CGRect, on screen: NSScreen) -> CGRect {
+        CGRect(x: rect.minX - screen.frame.minX, y: screen.frame.maxY - rect.maxY, width: rect.width, height: rect.height)
     }
 
     /// Captures every display in full, so area selection can happen on a frozen screen (CleanShot's "Freeze screen").
@@ -80,7 +88,7 @@ enum Capturer {
     }
 
     /// Everything on the display except Karuta itself, and (if chosen in Settings) Finder's desktop icons.
-    private static func filter(for display: SCDisplay, content: SCShareableContent) -> SCContentFilter {
+    static func displayFilter(for display: SCDisplay, content: SCShareableContent) -> SCContentFilter {
         let pid = ProcessInfo.processInfo.processIdentifier
         let ownApps = content.applications.filter { $0.processID == pid }
         guard Preferences.hideDesktopIcons else {

@@ -56,8 +56,13 @@ final class QuickOverlay {
             if Exporter.saveAs(card.shot) { remove(card, animated: true) }
         case .edit:
             remove(card, animated: false, remember: false)
+            if let video = card.shot.video {
+                NSWorkspace.shared.open(video) // QuickTime Player (or the default app) for trimming and playback
+                return
+            }
             onEdit?(card.original ?? card.shot, card.original != nil)
         case .pin:
+            guard card.shot.video == nil else { return NSSound.beep() }
             remove(card, animated: false, remember: false)
             onPin?(card.shot, card.frame)
         case .saveAll:
@@ -156,7 +161,8 @@ final class QuickOverlay {
     private func remove(_ card: OverlayCard, animated: Bool, slideOut: Bool = false, remember: Bool = true) {
         guard cards.contains(where: { $0 === card }) else { return }
         cards.removeAll { $0 === card }
-        if remember { ClosedShots.add(card.shot, original: card.original) }
+        // Recordings aren't kept: "restore" brings back images only.
+        if remember, card.shot.video == nil { ClosedShots.add(card.shot, original: card.original) }
         if animated {
             var frame = card.frame
             if slideOut { frame.origin.x = x(for: card, hidden: true, gap: 0) }
@@ -245,7 +251,7 @@ private final class OverlayCard: NSPanel {
         isReleasedWhenClosed = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
-        let view = CardView(frame: NSRect(origin: .zero, size: size), image: shot.image)
+        let view = CardView(frame: NSRect(origin: .zero, size: size), image: shot.image, isVideo: shot.video != nil)
         view.onAction = { [weak self] action in self?.onAction?(action) }
         view.makeFile = { [weak self] in self.flatMap { Exporter.writeTemporary($0.shot) } }
         view.onHover = { [weak self] hovering in
@@ -292,7 +298,7 @@ private final class CardView: NSView, NSDraggingSource {
     private var isDragging = false
     private var swipeDistance: CGFloat = 0
 
-    init(frame: NSRect, image: CGImage) {
+    init(frame: NSRect, image: CGImage, isVideo: Bool = false) {
         self.image = image
         super.init(frame: frame)
         wantsLayer = true
@@ -308,6 +314,16 @@ private final class CardView: NSView, NSDraggingSource {
         imageLayer.contentsGravity = .resizeAspect
         imageLayer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
         layer?.addSublayer(imageLayer)
+
+        let colors = NSImage.SymbolConfiguration(paletteColors: [NSColor.white, NSColor(white: 0, alpha: 0.45)])
+        let badgeConfig = NSImage.SymbolConfiguration(pointSize: 28, weight: .regular).applying(colors)
+        if isVideo, let symbol = NSImage(systemSymbolName: "play.circle.fill", accessibilityDescription: "収録")?
+            .withSymbolConfiguration(badgeConfig) {
+            let badge = NSImageView(image: symbol)
+            badge.frame = NSRect(x: (bounds.width - 34) / 2, y: (bounds.height - 34) / 2, width: 34, height: 34)
+            badge.autoresizingMask = [.minXMargin, .maxXMargin, .minYMargin, .maxYMargin]
+            addSubview(badge)
+        }
 
         buildHoverControls()
     }

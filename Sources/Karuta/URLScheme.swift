@@ -18,6 +18,8 @@ enum URLCommand {
     case restoreClosed
     case openSettings(SettingsPage)
     case shortcut(ShortcutAction)
+    /// Starts a recording (on the area, if given) or stops the one running.
+    case record((CGRect, NSScreen)?)
 
     @MainActor
     init?(_ url: URL) {
@@ -46,6 +48,7 @@ enum URLCommand {
         case "capture-window": self = .capture(.window, delivery)
         case "self-timer": self = .capture(.selfTimer, delivery)
         case "all-in-one": self = .allInOne(initial: Self.area(query)?.0)
+        case "record-screen": self = .record(Self.area(query))
         case "pin": self = .pin(file)
         case "open-annotate": self = .annotate(file)
         case "open-from-clipboard": self = .openClipboard

@@ -42,6 +42,12 @@ enum Exporter {
     }
 
     static func copy(_ shot: Shot) {
+        if let video = shot.video {
+            // A recording goes on the clipboard as the file, ready to paste into Finder, Slack, etc.
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.writeObjects([video as NSURL])
+            return
+        }
         guard let data = encode(exported(shot), as: .png) else { return }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
@@ -50,6 +56,11 @@ enum Exporter {
 
     @discardableResult
     static func save(_ shot: Shot, in directory: URL = Preferences.saveDirectory) throws -> URL {
+        if let video = shot.video {
+            let url = uniqueURL(in: directory, extension: video.pathExtension, app: shot.app)
+            try FileManager.default.copyItem(at: video, to: url)
+            return url
+        }
         let format = Preferences.format
         guard let data = fileData(shot, format: format) else { throw CocoaError(.fileWriteUnknown) }
         let url = uniqueURL(in: directory, extension: format.fileExtension, app: shot.app)
@@ -60,6 +71,22 @@ enum Exporter {
     /// Asks where to save (starting in the save folder). Returns whether it was saved.
     @MainActor
     static func saveAs(_ shot: Shot) -> Bool {
+        if let video = shot.video {
+            let panel = NSSavePanel()
+            panel.allowedContentTypes = [.mpeg4Movie]
+            panel.directoryURL = Preferences.saveDirectory
+            panel.nameFieldStringValue = defaultFileName(extension: video.pathExtension, app: shot.app)
+            NSApp.activate()
+            guard panel.runModal() == .OK, let url = panel.url else { return false }
+            do {
+                try? FileManager.default.removeItem(at: url) // the panel already asked about replacing it
+                try FileManager.default.copyItem(at: video, to: url)
+                return true
+            } catch {
+                NSAlert(error: error).runModal()
+                return false
+            }
+        }
         let format = Preferences.format
         let panel = NSSavePanel()
         panel.allowedContentTypes = [format.utType]
@@ -79,12 +106,24 @@ enum Exporter {
 
     /// Writes into a temp folder for drag & drop out of the quick overlay.
     static func writeTemporary(_ shot: Shot) -> URL? {
+        if let video = shot.video { return video }
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("Karuta", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return try? save(shot, in: directory)
     }
 
     /// From the template in Settings, e.g. "Karuta 2026-10-31 13.05.09.png".
+    /// Where recordings are written while they're in Quick Access (cleared by the system like any temp file).
+    static var recordingsDirectory: URL {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("Karuta/Recordings", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    static func temporaryRecordingURL(app: String?) -> URL {
+        uniqueURL(in: recordingsDirectory, extension: "mp4", app: app)
+    }
+
     static func defaultFileName(extension ext: String, app: String?) -> String {
         "\(baseName(app: app)).\(ext)"
     }
