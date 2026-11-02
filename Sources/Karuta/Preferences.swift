@@ -82,6 +82,37 @@ enum Preferences {
         set { set(newValue, for: "shutterSound") }
     }
 
+    /// Quick Access stacks on the right edge instead of the left.
+    static var overlayOnRight: Bool {
+        get { bool("overlayOnRight", default: false) }
+        set { set(newValue, for: "overlayOnRight") }
+    }
+
+    enum OverlaySize: String, CaseIterable {
+        case small, medium, large
+
+        var title: String {
+            switch self {
+            case .small: "小"
+            case .medium: "中"
+            case .large: "大"
+            }
+        }
+
+        var width: CGFloat {
+            switch self {
+            case .small: 180
+            case .medium: 220
+            case .large: 280
+            }
+        }
+    }
+
+    static var overlaySize: OverlaySize {
+        get { defaults.string(forKey: "overlaySize").flatMap(OverlaySize.init(rawValue:)) ?? .medium }
+        set { set(newValue.rawValue, for: "overlaySize") }
+    }
+
     /// Seconds before a Quick Access card closes by itself; 0 keeps it.
     static var autoCloseSeconds: Int {
         get { defaults.integer(forKey: "autoCloseSeconds") }
@@ -285,6 +316,7 @@ enum ShortcutAction: String, CaseIterable {
     case allInOne, area, window, fullscreen, previousArea, selfTimer
     case areaCopy, areaSave, areaAnnotate, areaPin
     case openClipboard, openFile, pinFile, restoreClosed, openHistory
+    case togglePins, unlockPins, closeAllPins
     case toggleOverlays, saveAllOverlays, closeAllOverlays
 
     var title: String {
@@ -304,6 +336,9 @@ enum ShortcutAction: String, CaseIterable {
         case .pinFile: "画像をピン留め…"
         case .restoreClosed: "最近閉じたものを戻す"
         case .openHistory: "撮影履歴…"
+        case .togglePins: "ピンを隠す / 表示"
+        case .unlockPins: "ピンのロックを解除"
+        case .closeAllPins: "ピンをすべて閉じる"
         case .toggleOverlays: "オーバーレイを隠す / 表示"
         case .saveAllOverlays: "オーバーレイをすべて保存"
         case .closeAllOverlays: "オーバーレイをすべて閉じる"
@@ -312,7 +347,7 @@ enum ShortcutAction: String, CaseIterable {
 
     /// The section it is listed under in Settings > Shortcuts, like CleanShot's groups.
     enum Group: String, CaseIterable {
-        case screenshots = "撮影", general = "一般", overlay = "クイックアクセス"
+        case screenshots = "撮影", general = "一般", overlay = "クイックアクセス", pins = "ピン留め"
     }
 
     var group: Group {
@@ -322,6 +357,7 @@ enum ShortcutAction: String, CaseIterable {
             .screenshots
         case .openClipboard, .openFile, .pinFile, .restoreClosed, .openHistory: .general
         case .toggleOverlays, .saveAllOverlays, .closeAllOverlays: .overlay
+        case .togglePins, .unlockPins, .closeAllPins: .pins
         }
     }
 

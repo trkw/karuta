@@ -26,9 +26,8 @@ final class QuickOverlay {
             guard let self, let card else { return }
             self.handle(action, for: card)
         }
-        // New cards slide in from the left edge at the bottom; older ones move up.
-        let target = NSPoint(x: screen.visibleFrame.minX + Self.margin, y: screen.visibleFrame.minY + Self.margin)
-        card.setFrameOrigin(NSPoint(x: screen.visibleFrame.minX - card.frame.width, y: target.y))
+        // New cards slide in from the screen edge at the bottom; older ones move up.
+        card.setFrameOrigin(NSPoint(x: x(for: card, hidden: true, gap: 0), y: screen.visibleFrame.minY + Self.margin))
         card.alphaValue = 0
         card.orderFrontRegardless()
         cards.insert(card, at: 0)
@@ -114,13 +113,22 @@ final class QuickOverlay {
         alert.runModal()
     }
 
+    /// Where a card sits: just inside its side of the screen, or (hidden) just past that edge.
+    private func x(for card: OverlayCard, hidden: Bool, gap: CGFloat = 20) -> CGFloat {
+        let screen = card.screenFrame
+        if card.onRight {
+            return hidden ? screen.maxX + gap : screen.maxX - Self.margin - card.frame.width
+        }
+        return hidden ? screen.minX - card.frame.width - gap : screen.minX + Self.margin
+    }
+
     private func setStackHidden(_ hidden: Bool) {
         isStackHidden = hidden
         layout(animated: true)
         updateTab()
     }
 
-    /// The tab sits on the left edge of the newest card's screen, at the middle of its stack.
+    /// The tab sits on the newest card's screen edge (its side), at the middle of its stack.
     private func updateTab() {
         guard isStackHidden, let newest = cards.first else {
             tab?.orderOut(nil)
@@ -131,9 +139,14 @@ final class QuickOverlay {
         let onScreen = cards.filter { $0.screenFrame == newest.screenFrame }
         let top = (onScreen.map(\.frame.maxY).max() ?? newest.frame.maxY)
         let bottom = newest.screenFrame.minY + Self.margin
-        let tab = self.tab ?? StackTab { [weak self] in self?.setStackHidden(false) }
+        if let existing = self.tab, existing.onRight != newest.onRight {
+            existing.orderOut(nil)
+            self.tab = nil
+        }
+        let tab = self.tab ?? StackTab(onRight: newest.onRight) { [weak self] in self?.setStackHidden(false) }
         let size = tab.frame.size
-        tab.setFrameOrigin(NSPoint(x: newest.screenFrame.minX, y: ((top + bottom) / 2 - size.height / 2).rounded()))
+        let x = newest.onRight ? newest.screenFrame.maxX - size.width : newest.screenFrame.minX
+        tab.setFrameOrigin(NSPoint(x: x, y: ((top + bottom) / 2 - size.height / 2).rounded()))
         tab.setCount(cards.count)
         tab.orderFrontRegardless()
         self.tab = tab
@@ -146,7 +159,7 @@ final class QuickOverlay {
         if remember { ClosedShots.add(card.shot, original: card.original) }
         if animated {
             var frame = card.frame
-            if slideOut { frame.origin.x = card.screenFrame.minX - frame.width }
+            if slideOut { frame.origin.x = x(for: card, hidden: true, gap: 0) }
             NSAnimationContext.runAnimationGroup({ context in
                 context.duration = 0.2
                 card.animator().alphaValue = 0
@@ -165,15 +178,15 @@ final class QuickOverlay {
     /// no longer fits below that screen's top edge.
     private func stack() -> (y: [ObjectIdentifier: CGFloat], overflow: OverlayCard?) {
         var y: [ObjectIdentifier: CGFloat] = [:]
-        var nextY: [CGFloat: CGFloat] = [:] // per screen (keyed by its minY+minX), the next free y
+        var nextY: [CGFloat: CGFloat] = [:] // per screen and side, the next free y
         var overflow: OverlayCard?
         for card in cards {
-            let key = card.screenFrame.minX * 100_000 + card.screenFrame.minY
+            let key = (card.screenFrame.minX * 100_000 + card.screenFrame.minY) * (card.onRight ? -1 : 1)
             let base = nextY[key] ?? card.screenFrame.minY + Self.margin
             y[ObjectIdentifier(card)] = base
             nextY[key] = base + card.frame.height + Self.spacing
             if base > card.screenFrame.minY + Self.margin, base + card.frame.height > card.screenFrame.maxY - Self.margin {
-                overflow = cards.last { $0.screenFrame == card.screenFrame }
+                overflow = cards.last { $0.screenFrame == card.screenFrame && $0.onRight == card.onRight }
             }
         }
         return (y, overflow)
@@ -187,8 +200,7 @@ final class QuickOverlay {
             context.duration = animated ? 0.25 : 0
             context.allowsImplicitAnimation = true
             for card in cards {
-                let x = hidden ? card.screenFrame.minX - card.frame.width - 20 : card.screenFrame.minX + Self.margin
-                let origin = NSPoint(x: x, y: y[ObjectIdentifier(card)] ?? 0)
+                let origin = NSPoint(x: x(for: card, hidden: hidden), y: y[ObjectIdentifier(card)] ?? 0)
                 card.animator().setFrame(NSRect(origin: origin, size: card.frame.size), display: true)
                 card.animator().alphaValue = hidden ? 0 : 1
             }
@@ -211,15 +223,17 @@ private final class OverlayCard: NSPanel {
     var original: Shot?
     /// The visible frame of the screen the card lives on.
     let screenFrame: NSRect
+    /// Which side of the screen it stacks on (Settings, at the time it was shown).
+    let onRight = Preferences.overlayOnRight
     var onAction: ((Action) -> Void)?
 
     init(shot: Shot, screen: NSScreen) {
         self.shot = shot
         screenFrame = screen.visibleFrame
 
-        let width: CGFloat = 220
+        let width = Preferences.overlaySize.width
         let aspect = CGFloat(shot.image.height) / CGFloat(max(shot.image.width, 1))
-        let size = NSSize(width: width, height: min(max(width * aspect, 90), 220))
+        let size = NSSize(width: width, height: min(max(width * aspect, width * 0.4), width))
 
         super.init(contentRect: NSRect(origin: .zero, size: size),
                    styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -578,9 +592,11 @@ private final class CircleButton: ClosureButton {
 
 /// The small handle left on the screen edge while the stack is hidden. Click to bring the cards back.
 private final class StackTab: NSPanel {
+    let onRight: Bool
     private let label = NSTextField(labelWithString: "")
 
-    init(onClick: @escaping () -> Void) {
+    init(onRight: Bool, onClick: @escaping () -> Void) {
+        self.onRight = onRight
         let size = NSSize(width: 22, height: 64)
         super.init(contentRect: NSRect(origin: .zero, size: size),
                    styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -593,6 +609,7 @@ private final class StackTab: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
         let button = TabButton(handler: onClick)
+        button.onRight = onRight
         button.frame = NSRect(origin: .zero, size: size)
         button.toolTip = "スタックを表示"
         contentView = button
@@ -600,7 +617,7 @@ private final class StackTab: NSPanel {
         label.font = .systemFont(ofSize: 10, weight: .bold)
         label.textColor = .white
         label.alignment = .center
-        label.frame = NSRect(x: 0, y: 8, width: size.width - 2, height: 14)
+        label.frame = NSRect(x: onRight ? 2 : 0, y: 8, width: size.width - 2, height: 14)
         button.addSubview(label)
     }
 
@@ -610,12 +627,15 @@ private final class StackTab: NSPanel {
 }
 
 private final class TabButton: ClosureButton {
+    var onRight = false
+
     override func draw(_ dirtyRect: NSRect) {
-        // Rounded on the right only (the left part is clipped by the view): it sticks out of the screen edge.
+        // Rounded on the inner side only (the outer part is clipped by the view): it sticks out of the screen edge.
         NSColor(white: 0.12, alpha: 0.9).setFill()
-        NSBezierPath(roundedRect: NSRect(x: -12, y: 0, width: bounds.width + 12, height: bounds.height),
+        NSBezierPath(roundedRect: NSRect(x: onRight ? 0 : -12, y: 0, width: bounds.width + 12, height: bounds.height),
                      xRadius: 10, yRadius: 10).fill()
-        let chevron = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: "スタックを表示")?
+        let chevron = NSImage(systemSymbolName: onRight ? "chevron.left" : "chevron.right",
+                              accessibilityDescription: "スタックを表示")?
             .withSymbolConfiguration(.init(pointSize: 11, weight: .bold))
         if let chevron {
             let tinted = NSImage(size: chevron.size, flipped: false) { rect in

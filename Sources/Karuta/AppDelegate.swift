@@ -63,6 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let groups: [[ShortcutAction]] = [
             [.allInOne, .area, .window, .fullscreen, .previousArea, .selfTimer],
             [.openClipboard, .openFile, .pinFile, .restoreClosed, .openHistory],
+            [.togglePins, .unlockPins, .closeAllPins],
         ]
         for group in groups {
             for action in group {
@@ -123,6 +124,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .restoreClosed:
             if !overlay.restoreClosed(on: NSScreen.underMouse) { NSSound.beep() }
         case .openHistory: openHistory()
+        case .togglePins:
+            // Hide them all if any is showing, otherwise bring them all back.
+            let anyVisible = pins.contains { $0.isVisible }
+            pins.forEach { anyVisible ? $0.orderOut(nil) : $0.orderFrontRegardless() }
+        case .unlockPins: pins.forEach { $0.isLocked = false }
+        case .closeAllPins: let all = pins; all.forEach { $0.close() }
         case .toggleOverlays: overlay.toggleHidden()
         case .saveAllOverlays: overlay.saveAll()
         case .closeAllOverlays: overlay.closeAll()
@@ -311,6 +318,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.onClose = { [weak self, weak window] in
             self?.pins.removeAll { $0 === window }
         }
+        window.onEdit = { [weak self] shot in self?.openEditor(shot) }
+        window.onCloseAll = { [weak self] in self?.perform(.closeAllPins) }
         pins.append(window)
         window.orderFrontRegardless()
     }
