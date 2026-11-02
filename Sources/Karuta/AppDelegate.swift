@@ -239,6 +239,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case let .fixed(rect, fixedScreen):
                     screen = fixedScreen
                     frame = rect
+                    // Like a dragged area, it becomes the previous area.
+                    if let id = screen.displayID {
+                        self.lastArea = (rect.offsetBy(dx: -screen.frame.minX, dy: -screen.frame.minY), id)
+                    }
                     shot = try await Capturer.captureDisplay(of: screen, rect: rect, content: content)
                 case .previousArea:
                     guard let last = self.lastArea,

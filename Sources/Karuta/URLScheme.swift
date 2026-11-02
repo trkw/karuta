@@ -86,7 +86,7 @@ enum URLCommand {
         let screens = NSScreen.screens
         let screen: NSScreen
         if let display = query["display"].flatMap(Int.init) {
-            guard screens.indices.contains(display - 1) else { return nil }
+            guard display >= 1, display <= screens.count else { return nil }
             screen = screens[display - 1]
         } else {
             screen = NSScreen.underMouse
