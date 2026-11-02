@@ -331,7 +331,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSTool
             counterField = nil
             if let target { buildOptions(for: target) }
         }
-        if let target, let segment = optionsSegment { segment.selectedSegment = canvas.style(for: target) }
+        if target != nil, let segment = optionsSegment { segment.selectedSegment = canvas.shownStyle }
         if let field = counterField, field.currentEditor() == nil { field.integerValue = canvas.nextCounter }
     }
 
@@ -413,7 +413,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSTool
     // MARK: - Commands
 
     private func handleCommand(_ key: String, shift: Bool) -> Bool {
-        if canvas.isEditingText {
+        // Typing in the canvas's text or a toolbar field (the counter's number): editing shortcuts go to the text.
+        if canvas.isEditingText || window?.firstResponder is NSText {
             // Without an Edit menu, the text field's standard editing shortcuts need to be sent by hand.
             let actions: [String: Selector] = [
                 "c": #selector(NSText.copy(_:)), "v": #selector(NSText.paste(_:)),

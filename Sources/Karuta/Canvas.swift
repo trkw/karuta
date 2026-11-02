@@ -120,7 +120,12 @@ final class CanvasView: NSView, NSTextFieldDelegate {
     private var counterOverride: Int?
     private var preview: Annotation? { didSet { needsDisplay = true } }
     private var crop: NSRect? { didSet { needsDisplay = true } }
-    private var selected: Int? { didSet { needsDisplay = true } }
+    private var selected: Int? {
+        didSet {
+            needsDisplay = true
+            if selected != oldValue { onStateChange?() } // the toolbar shows the selected mark's look
+        }
+    }
 
     private var dragStart: NSPoint?
     private var lastDrag: NSPoint?
@@ -232,8 +237,16 @@ final class CanvasView: NSView, NSTextFieldDelegate {
         set { counterOverride = max(0, newValue) }
     }
 
-    private func mark(_ kind: Annotation.Kind) -> Annotation {
-        Annotation(kind: kind, color: color, width: lineWidth, style: style(for: tool))
+    /// The look the toolbar shows: the selected mark's own, else the one new marks get.
+    var shownStyle: Int {
+        if tool == .select, let index = selected, annotations.indices.contains(index) { return annotations[index].style }
+        return styleTarget.map(style(for:)) ?? 0
+    }
+
+    /// A new mark in the current color, width and look. `tool` is the tool that made it, when that may
+    /// no longer be the current one (text is committed after switching tools).
+    private func mark(_ kind: Annotation.Kind, by tool: Tool? = nil) -> Annotation {
+        Annotation(kind: kind, color: color, width: lineWidth, style: style(for: tool ?? self.tool))
     }
 
     // MARK: Edits
@@ -631,7 +644,7 @@ final class CanvasView: NSView, NSTextFieldDelegate {
         let string = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         field.removeFromSuperview()
         if !string.isEmpty {
-            commit(annotations + [mark(.text(textOrigin, string))])
+            commit(annotations + [mark(.text(textOrigin, string), by: .text)])
         }
     }
 }
