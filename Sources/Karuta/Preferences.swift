@@ -117,6 +117,52 @@ enum Preferences {
         set { set(newValue, for: "selfTimerSeconds") }
     }
 
+    /// Locks the area selection to a ratio (A cycles it while selecting).
+    enum SelectionAspect: String, CaseIterable {
+        case free, square, fourThree, threeTwo, sixteenNine, nineSixteen
+
+        var title: String {
+            switch self {
+            case .free: "自由"
+            case .square: "1:1"
+            case .fourThree: "4:3"
+            case .threeTwo: "3:2"
+            case .sixteenNine: "16:9"
+            case .nineSixteen: "9:16"
+            }
+        }
+
+        /// Width divided by height; nil when free.
+        var ratio: CGFloat? {
+            switch self {
+            case .free: nil
+            case .square: 1
+            case .fourThree: 4.0 / 3
+            case .threeTwo: 3.0 / 2
+            case .sixteenNine: 16.0 / 9
+            case .nineSixteen: 9.0 / 16
+            }
+        }
+    }
+
+    static var selectionAspect: SelectionAspect {
+        get { defaults.string(forKey: "selectionAspect").flatMap(SelectionAspect.init(rawValue:)) ?? .free }
+        set { set(newValue.rawValue, for: "selectionAspect") }
+    }
+
+    /// A size in points (written like "1280x720") that F switches the area selection to; nil when unset.
+    static var fixedSelectionSize: CGSize? {
+        get { defaults.string(forKey: "fixedSelectionSize").flatMap(parseSize) }
+        set { set(newValue.map { "\(Int($0.width))x\(Int($0.height))" } ?? "", for: "fixedSelectionSize") }
+    }
+
+    /// "1280x720", "1280×720" or "1280 720" → 1280 × 720 (each side at least 4pt).
+    static func parseSize(_ text: String) -> CGSize? {
+        let numbers = text.split { !$0.isNumber }.compactMap { Int($0) }
+        guard numbers.count == 2, numbers.allSatisfy({ $0 >= 4 }) else { return nil }
+        return CGSize(width: numbers[0], height: numbers[1])
+    }
+
     // MARK: Editor backdrop
 
     enum BackdropStyle: String, CaseIterable {
