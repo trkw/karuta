@@ -242,6 +242,36 @@ enum Preferences {
         }
     }
 
+    /// Colors kept in the editor's color menu (most recent first).
+    static var savedColors: [NSColor] {
+        get { (defaults.stringArray(forKey: "savedColors") ?? []).compactMap(color(hex:)) }
+        set { set(Array(newValue.prefix(8)).map(hex(of:)), for: "savedColors") }
+    }
+
+    /// The editor's last look per tool (arrow, text, pixelate, counter), so it carries over to the next edit.
+    static func editorStyle(_ tool: String) -> Int {
+        defaults.integer(forKey: "editorStyle.\(tool)")
+    }
+
+    static func setEditorStyle(_ style: Int, for tool: String) {
+        defaults.set(style, forKey: "editorStyle.\(tool)") // not a setting shown anywhere: no change notice
+    }
+
+    /// "rrggbbaa" in sRGB.
+    private static func hex(of color: NSColor) -> String {
+        let rgb = color.usingColorSpace(.sRGB) ?? .black
+        func byte(_ c: CGFloat) -> UInt32 { UInt32((min(max(c, 0), 1) * 255).rounded()) }
+        let value = byte(rgb.redComponent) << 24 | byte(rgb.greenComponent) << 16 | byte(rgb.blueComponent) << 8
+            | byte(rgb.alphaComponent)
+        return String(format: "%08x", value)
+    }
+
+    private static func color(hex: String) -> NSColor? {
+        guard hex.count == 8, let value = UInt32(hex, radix: 16) else { return nil }
+        return NSColor(srgbRed: CGFloat(value >> 24 & 0xFF) / 255, green: CGFloat(value >> 16 & 0xFF) / 255,
+                       blue: CGFloat(value >> 8 & 0xFF) / 255, alpha: CGFloat(value & 0xFF) / 255)
+    }
+
     /// A picture chosen for the `.image` style.
     static var backdropImagePath: String? {
         get { defaults.string(forKey: "backdropImagePath") }
