@@ -1,4 +1,5 @@
 import AppKit
+import KarutaCore
 import ImageIO
 import UniformTypeIdentifiers
 
@@ -156,32 +157,10 @@ enum Exporter {
 
     /// `app` is the one that was in front at capture time (empty when unknown, e.g. a file or the clipboard).
     private static func baseName(app: String?, template: String = Preferences.fileNameTemplate) -> String {
-        let now = Date()
-        func formatted(_ format: String) -> String {
-            let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "en_US_POSIX")
-            formatter.dateFormat = format
-            return formatter.string(from: now)
-        }
-        let name = template
-            .replacingOccurrences(of: "{date}", with: formatted("yyyy-MM-dd"))
-            .replacingOccurrences(of: "{time}", with: formatted("HH.mm.ss"))
-            .replacingOccurrences(of: "{app}", with: app ?? "")
-            // "/" and ":" can't be in a file name; collapse the spaces an empty {app} leaves.
-            .replacingOccurrences(of: "/", with: "-")
-            .replacingOccurrences(of: ":", with: ".")
-            .split(separator: " ", omittingEmptySubsequences: true).joined(separator: " ")
-        return name.isEmpty ? "Karuta" : name
+        FileNaming.baseName(template: template, app: app, date: Date())
     }
 
     private static func uniqueURL(in directory: URL, extension ext: String, app: String?) -> URL {
-        let base = baseName(app: app)
-        var url = directory.appendingPathComponent("\(base).\(ext)")
-        var n = 2
-        while FileManager.default.fileExists(atPath: url.path) {
-            url = directory.appendingPathComponent("\(base) (\(n)).\(ext)")
-            n += 1
-        }
-        return url
+        FileNaming.uniqueURL(in: directory, base: baseName(app: app), extension: ext)
     }
 }

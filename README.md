@@ -132,6 +132,7 @@ Xcode（またはコマンドラインツール）が入った Mac で:
 ```sh
 make run       # build/Karuta.app を作って起動
 make install   # /Applications にコピー
+make test      # ファイル名の決め方などの確認 (karuta-check。CI でも回る)
 ```
 
 初回起動時に「画面収録」の許可を求められます。許可したあと、アプリを一度終了してから起動し直してください。

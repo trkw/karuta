@@ -12,6 +12,8 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - name: Checks
+        run: make test
       # 鍵が登録されていれば Developer ID で署名・公証する。無ければ（fork からの PR など）ad-hoc 署名のまま（docs/signing.md）
       - name: Build DMG
         env:
