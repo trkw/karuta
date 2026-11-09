@@ -125,11 +125,12 @@ enum Exporter {
         }
     }
 
-    /// Writes into a temp folder for drag & drop out of the quick overlay.
+    /// Writes into a temp folder for drag & drop out of the quick overlay and the editor, and for sharing.
+    /// Each file gets its own folder, so it's named from the template without " (2)" from earlier drags.
     static func writeTemporary(_ shot: Shot) -> URL? {
         if let video = shot.video { return video }
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(Bench.folderName, isDirectory: true)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let parent = FileManager.default.temporaryDirectory.appendingPathComponent("\(Bench.folderName)/Drag", isDirectory: true)
+        guard let directory = try? TempFolders.fresh(in: parent) else { return nil }
         return try? save(shot, in: directory)
     }
 
