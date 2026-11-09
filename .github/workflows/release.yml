@@ -67,3 +67,27 @@ jobs:
           fi
           gh release create "v$VERSION" "build/Karuta-$VERSION.dmg" build/Karuta.dmg \
             --target "$GITHUB_SHA" --title "Karuta $VERSION" --notes-file build/notes.md --generate-notes
+      # A short machine-readable record for agents (Muse collects results): in the job summary and as
+      # the release-summary artifact (gh run download <run> -n release-summary).
+      - name: Summary for agents
+        if: steps.version.outputs.skip != 'true'
+        env:
+          NOTARIZED: ${{ steps.build.outputs.notarized }}
+        run: |
+          gh release view "v$VERSION" --json tagName,url,isDraft,isPrerelease,publishedAt,assets \
+            --jq "{tag: .tagName, version: (.tagName | ltrimstr(\"v\")), url, draft: .isDraft, prerelease: .isPrerelease,
+                   published: .publishedAt, notarized: (\"$NOTARIZED\" == \"true\"), run: $GITHUB_RUN_ID,
+                   assets: [.assets[] | {name, size, url}]}" > build/release-summary.json
+          {
+            echo "## Karuta $VERSION"
+            echo
+            echo '```json'
+            cat build/release-summary.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: steps.version.outputs.skip != 'true'
+        with:
+          name: release-summary
+          path: build/release-summary.json
+          retention-days: 90
