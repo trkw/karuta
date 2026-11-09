@@ -40,6 +40,13 @@ enum Preferences {
         set { set(newValue, for: "copyToClipboard") }
     }
 
+    /// Copy area captures (including scrolling captures) even when `copyToClipboard` is off.
+    /// Full-screen and window captures, and recordings, follow `copyToClipboard` only.
+    static var copyAreaCaptureToClipboard: Bool {
+        get { bool("copyAreaCaptureToClipboard", default: false) }
+        set { set(newValue, for: "copyAreaCaptureToClipboard") }
+    }
+
     static var saveToFile: Bool {
         get { bool("saveToFile", default: false) }
         set { set(newValue, for: "saveToFile") }
