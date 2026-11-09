@@ -358,7 +358,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try Exporter.save(shot)
             } catch {
                 NSLog("Karuta: save failed: \(error)")
-                NSSound.beep()
+                // Keep the shot in Quick Access so it isn't lost, then say why it wasn't saved.
+                overlay.show(shot, original: backdrop ? raw : nil, on: screen)
+                QuickOverlay.showSaveError(error)
             }
             return
         case .annotate:
@@ -372,15 +374,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if Preferences.copyToClipboard || (kind == .area && Preferences.copyAreaCaptureToClipboard) {
             Exporter.copy(shot)
         }
+        var saveError: Error?
         if Preferences.saveToFile {
             do {
                 try Exporter.save(shot)
             } catch {
                 NSLog("Karuta: save failed: \(error)")
+                saveError = error
             }
         }
-        if Preferences.showOverlay { overlay.show(shot, original: backdrop ? raw : nil, on: screen) }
+        // A shot that couldn't be saved stays in Quick Access even when the overlay is off.
+        if Preferences.showOverlay || saveError != nil { overlay.show(shot, original: backdrop ? raw : nil, on: screen) }
         if Preferences.openEditor { openEditor(raw, background: backdrop) }
+        if let saveError { QuickOverlay.showSaveError(saveError) }
     }
 
     private func pin(_ shot: Shot, near frame: NSRect) {
@@ -612,18 +618,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func deliverRecording(_ shot: Shot, on screen: NSScreen) {
         if Preferences.copyToClipboard { Exporter.copy(shot) }
         var saved: URL?
+        var saveError: Error?
         if Preferences.saveToFile || !Preferences.showOverlay {
             do {
                 saved = try Exporter.save(shot)
             } catch {
                 NSLog("Karuta: save failed: \(error)")
+                saveError = error
             }
         }
-        if Preferences.showOverlay {
+        // A recording that couldn't be saved stays in Quick Access (it's still in the temp folder).
+        if Preferences.showOverlay || saveError != nil {
             overlay.show(shot, on: screen)
         } else if let saved {
             NSWorkspace.shared.activateFileViewerSelecting([saved])
         }
+        if let saveError { QuickOverlay.showSaveError(saveError) }
     }
 
     private static let blankImage: CGImage = {
