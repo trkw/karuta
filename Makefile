@@ -7,7 +7,11 @@ SIGN_IDENTITY ?= -
 VERSION ?= $(shell /usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" Support/Info.plist)
 DMG := $(BUILD_DIR)/$(APP_NAME)-$(VERSION).dmg
 
-.PHONY: app dmg dmg-image icon run install clean
+.PHONY: app dmg dmg-image icon run install clean test
+
+# Checks for KarutaCore (file naming). The Command Line Tools have no XCTest, so it's an executable.
+test:
+	swift run karuta-check
 
 app:
 	swift build -c release -Xswiftc -Osize
