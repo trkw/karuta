@@ -32,7 +32,7 @@ enum CaptureHistory {
 
     private static let directory: URL = {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let url = support.appendingPathComponent("Karuta/History", isDirectory: true)
+        let url = support.appendingPathComponent("\(Bench.folderName)/History", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }()
