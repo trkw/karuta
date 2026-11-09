@@ -128,8 +128,14 @@ enum Exporter {
         "\(baseName(app: app)).\(ext)"
     }
 
+    /// What a capture taken now would be called with `template` (for the example in Settings).
+    static func exampleFileName(template: String, extension ext: String, app: String?) -> String {
+        let template = template.trimmingCharacters(in: .whitespaces)
+        return "\(baseName(app: app, template: template.isEmpty ? Preferences.defaultFileNameTemplate : template)).\(ext)"
+    }
+
     /// `app` is the one that was in front at capture time (empty when unknown, e.g. a file or the clipboard).
-    private static func baseName(app: String?) -> String {
+    private static func baseName(app: String?, template: String = Preferences.fileNameTemplate) -> String {
         let now = Date()
         func formatted(_ format: String) -> String {
             let formatter = DateFormatter()
@@ -137,7 +143,7 @@ enum Exporter {
             formatter.dateFormat = format
             return formatter.string(from: now)
         }
-        let name = Preferences.fileNameTemplate
+        let name = template
             .replacingOccurrences(of: "{date}", with: formatted("yyyy-MM-dd"))
             .replacingOccurrences(of: "{time}", with: formatted("HH.mm.ss"))
             .replacingOccurrences(of: "{app}", with: app ?? "")
