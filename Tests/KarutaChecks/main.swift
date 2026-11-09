@@ -44,5 +44,19 @@ equal("the folder is kept",
       FileNaming.uniqueURL(in: folder, base: "x", extension: "jpg") { _ in false }.deletingLastPathComponent().path,
       "/tmp/karuta-check")
 
+// Temp folders for drag & drop
+let parent = FileManager.default.temporaryDirectory.appendingPathComponent("karuta-check-\(UUID().uuidString)")
+defer { try? FileManager.default.removeItem(at: parent) }
+let first = try! TempFolders.fresh(in: parent)
+let second = try! TempFolders.fresh(in: parent)
+check("each call gives a new empty folder", first != second
+      && (try? FileManager.default.contentsOfDirectory(atPath: second.path))?.isEmpty == true)
+let stale = parent.appendingPathComponent("stale", isDirectory: true)
+try! FileManager.default.createDirectory(at: stale, withIntermediateDirectories: true)
+try! FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -2 * 60 * 60)], ofItemAtPath: stale.path)
+_ = try! TempFolders.fresh(in: parent)
+check("folders older than an hour are removed", !FileManager.default.fileExists(atPath: stale.path))
+check("recent folders stay", FileManager.default.fileExists(atPath: first.path))
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
