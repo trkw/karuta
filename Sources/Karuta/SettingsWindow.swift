@@ -391,18 +391,30 @@ private struct PageBuilder {
         let formats = Preferences.ImageFormat.allCases
         let format = NSSegmentedControl(labels: formats.map(\.title), trackingMode: .selectOne, target: nil, action: nil)
         format.selectedSegment = formats.firstIndex(of: Preferences.format) ?? 0
-        ClosureTarget { sender in
-            guard let control = sender as? NSSegmentedControl else { return }
-            Preferences.format = formats[control.selectedSegment]
-        }.attach(to: format)
         let fileName = NSTextField(string: Preferences.fileNameTemplate)
         fileName.placeholderString = Preferences.defaultFileNameTemplate
         fileName.cell?.sendsActionOnEndEditing = true
         fileName.widthAnchor.constraint(equalToConstant: 220).isActive = true
+        // An example of the name a capture taken now would get, kept up to date while typing.
+        let example = label("", size: 11, weight: .regular, color: .secondaryLabelColor)
+        example.lineBreakMode = .byTruncatingMiddle
+        let updateExample = {
+            let name = Exporter.exampleFileName(template: fileName.stringValue,
+                                                extension: Preferences.format.fileExtension, app: "Safari")
+            example.stringValue = "例: \(name)"
+        }
+        updateExample()
+        ClosureTarget { sender in
+            guard let control = sender as? NSSegmentedControl else { return }
+            Preferences.format = formats[control.selectedSegment]
+            updateExample()
+        }.attach(to: format)
         ClosureTarget { sender in
             guard let field = sender as? NSTextField else { return }
             Preferences.fileNameTemplate = field.stringValue
+            updateExample()
         }.attach(to: fileName)
+        TextChangeHandler { updateExample() }.attach(to: fileName)
         let backdrop = NSPopUpButton(frame: .zero, pullsDown: false)
         backdrop.addItems(withTitles: Preferences.AutoBackdrop.allCases.map(\.title))
         backdrop.selectItem(at: Preferences.AutoBackdrop.allCases.firstIndex(of: Preferences.autoBackdrop) ?? 0)
@@ -441,6 +453,7 @@ private struct PageBuilder {
                 row("形式", control: format),
                 row("ファイル名", control: fileName),
                 noteRow("{date} は日付、{time} は時刻、{app} は手前にあったアプリの名前になります。"),
+                exampleRow(example),
                 switchRow("Retina を 1x に縮小", Preferences.scaleRetina,
                           note: "コピーと保存の画像を半分のピクセル数にします（見た目の大きさは同じ）。") { Preferences.scaleRetina = $0 },
             ]),
@@ -657,6 +670,12 @@ private struct PageBuilder {
         return row(title, control: holder)
     }
 
+    private func exampleRow(_ example: NSTextField) -> NSView {
+        let row = NSStackView(views: [example])
+        row.edgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 12, right: 0)
+        return row
+    }
+
     private func noteRow(_ text: String) -> NSView {
         let note = label(text, size: 11, weight: .regular, color: .secondaryLabelColor)
         note.lineBreakMode = .byWordWrapping
@@ -733,6 +752,23 @@ private final class ClosureTarget: NSObject {
     }
 
     @objc private func fire(_ sender: Any?) { handler(sender) }
+}
+
+/// Calls a closure on every edit of a text field (retained by the field via an associated object).
+private final class TextChangeHandler: NSObject, NSTextFieldDelegate {
+    private static var key = 0
+    private let handler: () -> Void
+
+    init(_ handler: @escaping () -> Void) {
+        self.handler = handler
+    }
+
+    func attach(to field: NSTextField) {
+        field.delegate = self
+        objc_setAssociatedObject(field, &Self.key, self, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+    }
+
+    func controlTextDidChange(_ notification: Notification) { handler() }
 }
 
 private final class FlippedView: NSView {
