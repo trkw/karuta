@@ -111,7 +111,7 @@ final class QuickOverlay {
         return true
     }
 
-    private static func showSaveError(_ error: Error) {
+    static func showSaveError(_ error: Error) {
         let alert = NSAlert(error: error)
         alert.messageText = "保存できませんでした"
         NSApp.activate()
