@@ -51,7 +51,27 @@ enum Exporter {
         guard let data = encode(exported(shot), as: .png) else { return }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setData(data, forType: .png)
+        guard Preferences.copyAsFile, let file = writeClipboardFile(shot) else {
+            pasteboard.setData(data, forType: .png)
+            return
+        }
+        // One item with both: apps that take images get the PNG, Finder and chat apps get the file.
+        let item = NSPasteboardItem()
+        item.setData(data, forType: .png)
+        item.setString(file.absoluteString, forType: .fileURL)
+        pasteboard.writeObjects([item])
+    }
+
+    /// The file behind "copy as a file": in the format chosen in Settings, named from the template,
+    /// in a temp folder (never the save folder). Only the latest copy is kept; older ones are removed.
+    static func writeClipboardFile(_ shot: Shot) -> URL? {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("Karuta/Clipboard", isDirectory: true)
+        let fileManager = FileManager.default
+        if let old = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) {
+            for url in old { try? fileManager.removeItem(at: url) }
+        }
+        try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        return try? save(shot, in: directory)
     }
 
     @discardableResult

@@ -456,6 +456,8 @@ private struct PageBuilder {
                 exampleRow(example),
                 switchRow("Retina を 1x に縮小", Preferences.scaleRetina,
                           note: "コピーと保存の画像を半分のピクセル数にします（見た目の大きさは同じ）。") { Preferences.scaleRetina = $0 },
+                switchRow("コピーにファイルも付ける", Preferences.copyAsFile,
+                          note: "画像をコピーするとき、上の形式のファイルもクリップボードに入れます。Finder やチャットにファイルとして貼れます。ファイルは一時フォルダに置き、次にコピーしたときに消します。") { Preferences.copyAsFile = $0 },
             ]),
             section("撮影", rows: [
                 switchRow("マウスカーソルを写す", Preferences.showCursor,

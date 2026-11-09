@@ -138,6 +138,12 @@ enum Preferences {
         set { set(newValue, for: "scaleRetina") }
     }
 
+    /// Copying an image also puts a file (in the chosen format) on the clipboard, next to the PNG data.
+    static var copyAsFile: Bool {
+        get { bool("copyAsFile", default: false) }
+        set { set(newValue, for: "copyAsFile") }
+    }
+
     static let defaultFileNameTemplate = "Karuta {date} {time}"
 
     /// The saved file's name; {date}, {time} and {app} (the app in front) are filled in.
