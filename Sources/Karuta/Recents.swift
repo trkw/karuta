@@ -87,7 +87,7 @@ enum ClosedShots {
 
     private static let directory: URL = {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        let url = caches.appendingPathComponent("Karuta/Closed", isDirectory: true)
+        let url = caches.appendingPathComponent("\(Bench.folderName)/Closed", isDirectory: true)
         // Start empty each launch: leftovers belong to a previous session.
         try? FileManager.default.removeItem(at: url)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)

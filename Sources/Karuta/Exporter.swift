@@ -66,7 +66,7 @@ enum Exporter {
     /// The file behind "copy as a file": in the format chosen in Settings, named from the template,
     /// in a temp folder (never the save folder). Only the latest copy is kept; older ones are removed.
     static func writeClipboardFile(_ shot: Shot) -> URL? {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("Karuta/Clipboard", isDirectory: true)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("\(Bench.folderName)/Clipboard", isDirectory: true)
         let fileManager = FileManager.default
         if let old = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) {
             for url in old { try? fileManager.removeItem(at: url) }
@@ -128,7 +128,7 @@ enum Exporter {
     /// Writes into a temp folder for drag & drop out of the quick overlay.
     static func writeTemporary(_ shot: Shot) -> URL? {
         if let video = shot.video { return video }
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("Karuta", isDirectory: true)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(Bench.folderName, isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return try? save(shot, in: directory)
     }
@@ -136,7 +136,7 @@ enum Exporter {
     /// From the template in Settings, e.g. "Karuta 2026-10-31 13.05.09.png".
     /// Where recordings are written while they're in Quick Access (cleared by the system like any temp file).
     static var recordingsDirectory: URL {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("Karuta/Recordings", isDirectory: true)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("\(Bench.folderName)/Recordings", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }

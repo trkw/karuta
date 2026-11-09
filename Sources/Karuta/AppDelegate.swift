@@ -40,7 +40,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         overlay.onEdit = { [weak self] shot, background in self?.openEditor(shot, background: background) }
         overlay.onPin = { [weak self] shot, frame in self?.pin(shot, near: frame) }
-        if !CGPreflightScreenCaptureAccess() {
+        // The bench copy doesn't put up the system prompt at launch (it would take the screen).
+        if !CGPreflightScreenCaptureAccess() && !Bench.isActive {
             CGRequestScreenCaptureAccess()
         }
     }
@@ -136,6 +137,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func registerHotKeys() {
         let hotKeys = HotKeyCenter.shared
         hotKeys.unregisterAll()
+        // The bench copy (scripts/make-bench-copy.sh) runs next to the real Karuta for checks; it must not
+        // take the global shortcuts away from it.
+        guard !Bench.isActive else { return }
         for action in ShortcutAction.allCases {
             guard let shortcut = Preferences.shortcut(for: action) else { continue }
             hotKeys.register(keyCode: Int(shortcut.keyCode), modifiers: Int(shortcut.modifiers)) { [weak self] in
