@@ -686,6 +686,11 @@ private struct PageBuilder {
         let icon = NSImageView(image: NSWorkspace.shared.icon(forFile: Preferences.saveDirectory.path))
         icon.widthAnchor.constraint(equalToConstant: 16).isActive = true
         icon.heightAnchor.constraint(equalToConstant: 16).isActive = true
+        // The folder chosen earlier is gone, so captures quietly go to the Desktop: say so.
+        let missing = label(Preferences.missingSaveDirectory.map {
+            "「\(($0 as NSString).lastPathComponent)」が見つからないため、デスクトップに保存しています"
+        } ?? "", size: 11, weight: .regular, color: .systemOrange)
+        missing.isHidden = Preferences.missingSaveDirectory == nil
         let choose = NSButton(title: "選択…", target: nil, action: nil)
         choose.bezelStyle = .rounded
         choose.controlSize = .small
@@ -701,6 +706,7 @@ private struct PageBuilder {
                 Preferences.saveDirectory = url
                 name.stringValue = FileManager.default.displayName(atPath: url.path)
                 icon.image = NSWorkspace.shared.icon(forFile: url.path)
+                missing.isHidden = true
             }
             if let window = (sender as? NSView)?.window {
                 panel.beginSheetModal(for: window, completionHandler: apply)
@@ -711,7 +717,11 @@ private struct PageBuilder {
         let stack = NSStackView(views: [icon, name, choose])
         stack.spacing = 6
         stack.setCustomSpacing(12, after: name)
-        return stack
+        let column = NSStackView(views: [stack, missing])
+        column.orientation = .vertical
+        column.alignment = .trailing
+        column.spacing = 4
+        return column
     }
 }
 

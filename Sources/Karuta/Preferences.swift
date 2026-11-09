@@ -362,6 +362,14 @@ enum Preferences {
         set { set(newValue.path, for: "saveDirectory") }
     }
 
+    /// The chosen save folder when it can't be found (renamed, deleted, or on a drive that isn't connected),
+    /// in which case captures go to the Desktop instead.
+    static var missingSaveDirectory: String? {
+        guard let path = defaults.string(forKey: "saveDirectory"),
+              !FileManager.default.fileExists(atPath: path) else { return nil }
+        return path
+    }
+
     static func shortcut(for action: ShortcutAction) -> Shortcut? {
         let key = "shortcut.\(action.rawValue)"
         guard let value = defaults.dictionary(forKey: key) else { return action.defaultShortcut }
