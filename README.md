@@ -127,7 +127,7 @@ open "karuta://pin?filepath=~/Desktop/image.png"
 
 ## ビルド
 
-Xcode（またはコマンドラインツール）が入った Mac で:
+Xcode（またはコマンドラインツール）が入った Mac で（Nix があれば `nix develop` か direnv で gh・jq・shellcheck の入った開発用のシェルに入れる。Swift と SDK は Apple のものをそのまま使い、コマンドラインツールだけのときは SDK 26 を選ぶ）:
 
 ```sh
 make run       # build/Karuta.app を作って起動
