@@ -368,7 +368,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             pin(shot, near: frame)
             return
         }
-        if Preferences.copyToClipboard { Exporter.copy(shot) }
+        // Copy once even when both the general and the area-only setting are on.
+        if Preferences.copyToClipboard || (kind == .area && Preferences.copyAreaCaptureToClipboard) {
+            Exporter.copy(shot)
+        }
         if Preferences.saveToFile {
             do {
                 try Exporter.save(shot)

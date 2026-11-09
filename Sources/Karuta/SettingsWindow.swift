@@ -544,6 +544,9 @@ private struct PageBuilder {
             header,
             checkRow("クイックアクセスを表示", Preferences.showOverlay) { Preferences.showOverlay = $0 },
             checkRow("クリップボードにコピー", Preferences.copyToClipboard) { Preferences.copyToClipboard = $0 },
+            checkRow("範囲キャプチャをクリップボードにコピー", Preferences.copyAreaCaptureToClipboard) {
+                Preferences.copyAreaCaptureToClipboard = $0
+            },
             checkRow("保存", Preferences.saveToFile) { Preferences.saveToFile = $0 },
             checkRow("注釈エディタを開く", Preferences.openEditor) { Preferences.openEditor = $0 },
         ]
