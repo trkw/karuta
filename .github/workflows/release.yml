@@ -21,7 +21,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       INPUT_VERSION: ${{ inputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Resolve version
         id: version
         run: |
@@ -85,7 +85,7 @@ jobs:
             cat build/release-summary.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: steps.version.outputs.skip != 'true'
         with:
           name: release-summary

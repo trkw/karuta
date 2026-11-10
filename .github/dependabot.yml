@@ -1,0 +1,7 @@
+# GitHub Actions only: Karuta has no package dependencies (AppKit and ScreenCaptureKit only).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
