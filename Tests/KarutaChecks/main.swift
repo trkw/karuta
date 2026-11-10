@@ -109,5 +109,21 @@ equal("bench clipboard folder", TempFolders.directory(.clipboard, folderName: "K
 check("same URL as the old inline expression",
       TempFolders.directory(.drag, folderName: "Karuta Bench") == FileManager.default.temporaryDirectory.appendingPathComponent("Karuta Bench/Drag", isDirectory: true))
 
+// UserDefaults keys (K7). The strings Preferences used before; a changed one would lose that setting
+let storedKeys = [
+    "showOverlay", "copyToClipboard", "copyAreaCaptureToClipboard", "saveToFile", "freezeScreen", "playSound",
+    "openEditor", "showMenuBarIcon", "hideDesktopIcons", "showLoupe", "shutterSound", "overlayOnRight",
+    "overlaySize", "autoCloseSeconds", "showCursor", "scaleRetina", "copyAsFile", "fileNameTemplate",
+    "historyDays", "selfTimerSeconds", "selectionAspect", "fixedSelectionSize", "backdropStyle", "backdropGradient",
+    "backdropColor", "recordingFormat", "recordingCountdown", "recordingFrameRate", "recordSystemAudio", "showClicks",
+    "savedColors", "backdropImagePath", "autoBackdrop", "backdropPadding", "format", "saveDirectory",
+]
+equal("every key is listed", "\(PreferenceKey.allCases.count)", "\(storedKeys.count)")
+for (key, stored) in zip(PreferenceKey.allCases, storedKeys) {
+    equal("key \(stored)", key.rawValue, stored)
+}
+equal("editor style key", PreferenceKey.editorStyle("arrow"), "editorStyle.arrow")
+equal("shortcut key", PreferenceKey.shortcut("area"), "shortcut.area")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)

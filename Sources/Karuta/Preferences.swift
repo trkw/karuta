@@ -1,4 +1,5 @@
 import AppKit
+import KarutaCore
 import Carbon.HIToolbox
 import UniformTypeIdentifiers
 
@@ -29,70 +30,71 @@ enum Preferences {
     }
 
     private static let defaults = UserDefaults.standard
+    private typealias Key = PreferenceKey
 
     static var showOverlay: Bool {
-        get { bool("showOverlay", default: true) }
-        set { set(newValue, for: "showOverlay") }
+        get { bool(.showOverlay, default: true) }
+        set { set(newValue, for: .showOverlay) }
     }
 
     static var copyToClipboard: Bool {
-        get { bool("copyToClipboard", default: false) }
-        set { set(newValue, for: "copyToClipboard") }
+        get { bool(.copyToClipboard, default: false) }
+        set { set(newValue, for: .copyToClipboard) }
     }
 
     /// Copy area captures (including scrolling captures) even when `copyToClipboard` is off.
     /// Full-screen and window captures, and recordings, follow `copyToClipboard` only.
     static var copyAreaCaptureToClipboard: Bool {
-        get { bool("copyAreaCaptureToClipboard", default: false) }
-        set { set(newValue, for: "copyAreaCaptureToClipboard") }
+        get { bool(.copyAreaCaptureToClipboard, default: false) }
+        set { set(newValue, for: .copyAreaCaptureToClipboard) }
     }
 
     static var saveToFile: Bool {
-        get { bool("saveToFile", default: false) }
-        set { set(newValue, for: "saveToFile") }
+        get { bool(.saveToFile, default: false) }
+        set { set(newValue, for: .saveToFile) }
     }
 
     static var freezeScreen: Bool {
-        get { bool("freezeScreen", default: true) }
-        set { set(newValue, for: "freezeScreen") }
+        get { bool(.freezeScreen, default: true) }
+        set { set(newValue, for: .freezeScreen) }
     }
 
     static var playSound: Bool {
-        get { bool("playSound", default: true) }
-        set { set(newValue, for: "playSound") }
+        get { bool(.playSound, default: true) }
+        set { set(newValue, for: .playSound) }
     }
 
     static var openEditor: Bool {
-        get { bool("openEditor", default: false) }
-        set { set(newValue, for: "openEditor") }
+        get { bool(.openEditor, default: false) }
+        set { set(newValue, for: .openEditor) }
     }
 
     static var showMenuBarIcon: Bool {
-        get { bool("showMenuBarIcon", default: true) }
-        set { set(newValue, for: "showMenuBarIcon") }
+        get { bool(.showMenuBarIcon, default: true) }
+        set { set(newValue, for: .showMenuBarIcon) }
     }
 
     /// Leaves Finder's desktop icons out of captures (the wallpaper stays).
     static var hideDesktopIcons: Bool {
-        get { bool("hideDesktopIcons", default: false) }
-        set { set(newValue, for: "hideDesktopIcons") }
+        get { bool(.hideDesktopIcons, default: false) }
+        set { set(newValue, for: .hideDesktopIcons) }
     }
 
     static var showLoupe: Bool {
-        get { bool("showLoupe", default: true) }
-        set { set(newValue, for: "showLoupe") }
+        get { bool(.showLoupe, default: true) }
+        set { set(newValue, for: .showLoupe) }
     }
 
     /// Empty means the system screenshot sound; otherwise the name of a system sound such as "Pop".
     static var shutterSound: String {
-        get { defaults.string(forKey: "shutterSound") ?? "" }
-        set { set(newValue, for: "shutterSound") }
+        get { defaults.string(forKey: Key.shutterSound.rawValue) ?? "" }
+        set { set(newValue, for: .shutterSound) }
     }
 
     /// Quick Access stacks on the right edge instead of the left.
     static var overlayOnRight: Bool {
-        get { bool("overlayOnRight", default: false) }
-        set { set(newValue, for: "overlayOnRight") }
+        get { bool(.overlayOnRight, default: false) }
+        set { set(newValue, for: .overlayOnRight) }
     }
 
     enum OverlaySize: String, CaseIterable {
@@ -116,32 +118,32 @@ enum Preferences {
     }
 
     static var overlaySize: OverlaySize {
-        get { defaults.string(forKey: "overlaySize").flatMap(OverlaySize.init(rawValue:)) ?? .medium }
-        set { set(newValue.rawValue, for: "overlaySize") }
+        get { defaults.string(forKey: Key.overlaySize.rawValue).flatMap(OverlaySize.init(rawValue:)) ?? .medium }
+        set { set(newValue.rawValue, for: .overlaySize) }
     }
 
     /// Seconds before a Quick Access card closes by itself; 0 keeps it.
     static var autoCloseSeconds: Int {
-        get { defaults.integer(forKey: "autoCloseSeconds") }
-        set { set(newValue, for: "autoCloseSeconds") }
+        get { defaults.integer(forKey: Key.autoCloseSeconds.rawValue) }
+        set { set(newValue, for: .autoCloseSeconds) }
     }
 
     /// Puts the mouse pointer in screenshots (with "画面を止めて選ぶ", where it was when the screen froze).
     static var showCursor: Bool {
-        get { bool("showCursor", default: false) }
-        set { set(newValue, for: "showCursor") }
+        get { bool(.showCursor, default: false) }
+        set { set(newValue, for: .showCursor) }
     }
 
     /// Copies and saves Retina shots at 1x (half the pixels), like CleanShot's "Scale Retina screenshots to 1x".
     static var scaleRetina: Bool {
-        get { bool("scaleRetina", default: false) }
-        set { set(newValue, for: "scaleRetina") }
+        get { bool(.scaleRetina, default: false) }
+        set { set(newValue, for: .scaleRetina) }
     }
 
     /// Copying an image also puts a file (in the chosen format) on the clipboard, next to the PNG data.
     static var copyAsFile: Bool {
-        get { bool("copyAsFile", default: false) }
-        set { set(newValue, for: "copyAsFile") }
+        get { bool(.copyAsFile, default: false) }
+        set { set(newValue, for: .copyAsFile) }
     }
 
     static let defaultFileNameTemplate = "Karuta {date} {time}"
@@ -149,22 +151,22 @@ enum Preferences {
     /// The saved file's name; {date}, {time} and {app} (the app in front) are filled in.
     static var fileNameTemplate: String {
         get {
-            let value = defaults.string(forKey: "fileNameTemplate")?.trimmingCharacters(in: .whitespaces) ?? ""
+            let value = defaults.string(forKey: Key.fileNameTemplate.rawValue)?.trimmingCharacters(in: .whitespaces) ?? ""
             return value.isEmpty ? defaultFileNameTemplate : value
         }
-        set { set(newValue, for: "fileNameTemplate") }
+        set { set(newValue, for: .fileNameTemplate) }
     }
 
     /// Days captures stay in the capture history; 0 turns it off.
     static var historyDays: Int {
-        get { defaults.object(forKey: "historyDays") == nil ? 7 : defaults.integer(forKey: "historyDays") }
-        set { set(newValue, for: "historyDays") }
+        get { defaults.object(forKey: Key.historyDays.rawValue) == nil ? 7 : defaults.integer(forKey: Key.historyDays.rawValue) }
+        set { set(newValue, for: .historyDays) }
     }
 
     /// Seconds the self-timer counts down before taking the shot.
     static var selfTimerSeconds: Int {
-        get { defaults.object(forKey: "selfTimerSeconds") == nil ? 5 : defaults.integer(forKey: "selfTimerSeconds") }
-        set { set(newValue, for: "selfTimerSeconds") }
+        get { defaults.object(forKey: Key.selfTimerSeconds.rawValue) == nil ? 5 : defaults.integer(forKey: Key.selfTimerSeconds.rawValue) }
+        set { set(newValue, for: .selfTimerSeconds) }
     }
 
     /// Locks the area selection to a ratio (A cycles it while selecting).
@@ -196,14 +198,14 @@ enum Preferences {
     }
 
     static var selectionAspect: SelectionAspect {
-        get { defaults.string(forKey: "selectionAspect").flatMap(SelectionAspect.init(rawValue:)) ?? .free }
-        set { set(newValue.rawValue, for: "selectionAspect") }
+        get { defaults.string(forKey: Key.selectionAspect.rawValue).flatMap(SelectionAspect.init(rawValue:)) ?? .free }
+        set { set(newValue.rawValue, for: .selectionAspect) }
     }
 
     /// A size in points (written like "1280x720") that F switches the area selection to; nil when unset.
     static var fixedSelectionSize: CGSize? {
-        get { defaults.string(forKey: "fixedSelectionSize").flatMap(parseSize) }
-        set { set(newValue.map { "\(Int($0.width))x\(Int($0.height))" } ?? "", for: "fixedSelectionSize") }
+        get { defaults.string(forKey: Key.fixedSelectionSize.rawValue).flatMap(parseSize) }
+        set { set(newValue.map { "\(Int($0.width))x\(Int($0.height))" } ?? "", for: .fixedSelectionSize) }
     }
 
     /// "1280x720", "1280×720" or "1280 720" → 1280 × 720 (each side at least 4pt).
@@ -229,19 +231,19 @@ enum Preferences {
     }
 
     static var backdropStyle: BackdropStyle {
-        get { defaults.string(forKey: "backdropStyle").flatMap(BackdropStyle.init(rawValue:)) ?? .gradient }
-        set { set(newValue.rawValue, for: "backdropStyle") }
+        get { defaults.string(forKey: Key.backdropStyle.rawValue).flatMap(BackdropStyle.init(rawValue:)) ?? .gradient }
+        set { set(newValue.rawValue, for: .backdropStyle) }
     }
 
     /// Index into `Backdrop.gradients`.
     static var backdropGradient: Int {
-        get { defaults.integer(forKey: "backdropGradient") }
-        set { set(newValue, for: "backdropGradient") }
+        get { defaults.integer(forKey: Key.backdropGradient.rawValue) }
+        set { set(newValue, for: .backdropGradient) }
     }
 
     static var backdropColor: NSColor {
         get {
-            guard let hex = defaults.string(forKey: "backdropColor"), let value = UInt32(hex, radix: 16) else {
+            guard let hex = defaults.string(forKey: Key.backdropColor.rawValue), let value = UInt32(hex, radix: 16) else {
                 return NSColor(srgbRed: 0.95, green: 0.95, blue: 0.97, alpha: 1)
             }
             return NSColor(srgbRed: CGFloat(value >> 16 & 0xFF) / 255, green: CGFloat(value >> 8 & 0xFF) / 255,
@@ -251,7 +253,7 @@ enum Preferences {
             let rgb = newValue.usingColorSpace(.sRGB) ?? .white
             func byte(_ c: CGFloat) -> UInt32 { UInt32((min(max(c, 0), 1) * 255).rounded()) }
             let value = byte(rgb.redComponent) << 16 | byte(rgb.greenComponent) << 8 | byte(rgb.blueComponent)
-            set(String(value, radix: 16), for: "backdropColor")
+            set(String(value, radix: 16), for: .backdropColor)
         }
     }
 
@@ -264,46 +266,46 @@ enum Preferences {
     }
 
     static var recordingFormat: RecordingFormat {
-        get { defaults.string(forKey: "recordingFormat").flatMap(RecordingFormat.init(rawValue:)) ?? .mp4 }
-        set { set(newValue.rawValue, for: "recordingFormat") }
+        get { defaults.string(forKey: Key.recordingFormat.rawValue).flatMap(RecordingFormat.init(rawValue:)) ?? .mp4 }
+        set { set(newValue.rawValue, for: .recordingFormat) }
     }
 
     /// Seconds of countdown before a recording starts (0: none).
     static var recordingCountdown: Int {
-        get { defaults.object(forKey: "recordingCountdown") == nil ? 3 : defaults.integer(forKey: "recordingCountdown") }
-        set { set(newValue, for: "recordingCountdown") }
+        get { defaults.object(forKey: Key.recordingCountdown.rawValue) == nil ? 3 : defaults.integer(forKey: Key.recordingCountdown.rawValue) }
+        set { set(newValue, for: .recordingCountdown) }
     }
 
     static var recordingFrameRate: Int {
-        get { defaults.integer(forKey: "recordingFrameRate") == 60 ? 60 : 30 }
-        set { set(newValue, for: "recordingFrameRate") }
+        get { defaults.integer(forKey: Key.recordingFrameRate.rawValue) == 60 ? 60 : 30 }
+        set { set(newValue, for: .recordingFrameRate) }
     }
 
     /// The Mac's own sound (apps, videos), MP4 only.
     static var recordSystemAudio: Bool {
-        get { bool("recordSystemAudio", default: false) }
-        set { set(newValue, for: "recordSystemAudio") }
+        get { bool(.recordSystemAudio, default: false) }
+        set { set(newValue, for: .recordSystemAudio) }
     }
 
     /// Rings around clicks in recordings (macOS 15 and later).
     static var showClicks: Bool {
-        get { bool("showClicks", default: false) }
-        set { set(newValue, for: "showClicks") }
+        get { bool(.showClicks, default: false) }
+        set { set(newValue, for: .showClicks) }
     }
 
     /// Colors kept in the editor's color menu (most recent first).
     static var savedColors: [NSColor] {
-        get { (defaults.stringArray(forKey: "savedColors") ?? []).compactMap(color(hex:)) }
-        set { set(Array(newValue.prefix(8)).map(hex(of:)), for: "savedColors") }
+        get { (defaults.stringArray(forKey: Key.savedColors.rawValue) ?? []).compactMap(color(hex:)) }
+        set { set(Array(newValue.prefix(8)).map(hex(of:)), for: .savedColors) }
     }
 
     /// The editor's last look per tool (arrow, text, pixelate, counter), so it carries over to the next edit.
     static func editorStyle(_ tool: String) -> Int {
-        defaults.integer(forKey: "editorStyle.\(tool)")
+        defaults.integer(forKey: Key.editorStyle(tool))
     }
 
     static func setEditorStyle(_ style: Int, for tool: String) {
-        defaults.set(style, forKey: "editorStyle.\(tool)") // not a setting shown anywhere: no change notice
+        defaults.set(style, forKey: Key.editorStyle(tool)) // not a setting shown anywhere: no change notice
     }
 
     /// "rrggbbaa" in sRGB.
@@ -323,8 +325,8 @@ enum Preferences {
 
     /// A picture chosen for the `.image` style.
     static var backdropImagePath: String? {
-        get { defaults.string(forKey: "backdropImagePath") }
-        set { set(newValue ?? "", for: "backdropImagePath") }
+        get { defaults.string(forKey: Key.backdropImagePath.rawValue) }
+        set { set(newValue ?? "", for: .backdropImagePath) }
     }
 
     /// Which shots get the backdrop right after capture (copy, save and thumbnail use the result;
@@ -342,42 +344,42 @@ enum Preferences {
     }
 
     static var autoBackdrop: AutoBackdrop {
-        get { defaults.string(forKey: "autoBackdrop").flatMap(AutoBackdrop.init(rawValue:)) ?? .off }
-        set { set(newValue.rawValue, for: "autoBackdrop") }
+        get { defaults.string(forKey: Key.autoBackdrop.rawValue).flatMap(AutoBackdrop.init(rawValue:)) ?? .off }
+        set { set(newValue.rawValue, for: .autoBackdrop) }
     }
 
     /// Space around the shot, as a percentage of its shorter side.
     static var backdropPadding: Int {
-        get { defaults.object(forKey: "backdropPadding") == nil ? 8 : defaults.integer(forKey: "backdropPadding") }
-        set { set(newValue, for: "backdropPadding") }
+        get { defaults.object(forKey: Key.backdropPadding.rawValue) == nil ? 8 : defaults.integer(forKey: Key.backdropPadding.rawValue) }
+        set { set(newValue, for: .backdropPadding) }
     }
 
     static var format: ImageFormat {
-        get { defaults.string(forKey: "format").flatMap(ImageFormat.init(rawValue:)) ?? .png }
-        set { set(newValue.rawValue, for: "format") }
+        get { defaults.string(forKey: Key.format.rawValue).flatMap(ImageFormat.init(rawValue:)) ?? .png }
+        set { set(newValue.rawValue, for: .format) }
     }
 
     static var saveDirectory: URL {
         get {
-            if let path = defaults.string(forKey: "saveDirectory"),
+            if let path = defaults.string(forKey: Key.saveDirectory.rawValue),
                FileManager.default.fileExists(atPath: path) {
                 return URL(fileURLWithPath: path, isDirectory: true)
             }
             return FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask)[0]
         }
-        set { set(newValue.path, for: "saveDirectory") }
+        set { set(newValue.path, for: .saveDirectory) }
     }
 
     /// The chosen save folder when it can't be found (renamed, deleted, or on a drive that isn't connected),
     /// in which case captures go to the Desktop instead.
     static var missingSaveDirectory: String? {
-        guard let path = defaults.string(forKey: "saveDirectory"),
+        guard let path = defaults.string(forKey: Key.saveDirectory.rawValue),
               !FileManager.default.fileExists(atPath: path) else { return nil }
         return path
     }
 
     static func shortcut(for action: ShortcutAction) -> Shortcut? {
-        let key = "shortcut.\(action.rawValue)"
+        let key = Key.shortcut(action.rawValue)
         guard let value = defaults.dictionary(forKey: key) else { return action.defaultShortcut }
         guard let code = value["keyCode"] as? Int, let modifiers = value["modifiers"] as? Int else { return nil }
         return Shortcut(keyCode: UInt32(code), modifiers: UInt32(modifiers))
@@ -386,11 +388,15 @@ enum Preferences {
     /// `nil` turns the shortcut off (stored explicitly, so the default doesn't come back).
     static func setShortcut(_ shortcut: Shortcut?, for action: ShortcutAction) {
         let value: [String: Int] = shortcut.map { ["keyCode": Int($0.keyCode), "modifiers": Int($0.modifiers)] } ?? [:]
-        set(value, for: "shortcut.\(action.rawValue)")
+        set(value, for: Key.shortcut(action.rawValue))
     }
 
-    private static func bool(_ key: String, default value: Bool) -> Bool {
-        defaults.object(forKey: key) == nil ? value : defaults.bool(forKey: key)
+    private static func bool(_ key: Key, default value: Bool) -> Bool {
+        defaults.object(forKey: key.rawValue) == nil ? value : defaults.bool(forKey: key.rawValue)
+    }
+
+    private static func set(_ value: Any, for key: Key) {
+        set(value, for: key.rawValue)
     }
 
     private static func set(_ value: Any, for key: String) {
