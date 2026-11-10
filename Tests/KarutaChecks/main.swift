@@ -32,6 +32,29 @@ equal("the next day in a time zone ahead of UTC",
       FileNaming.baseName(template: "{date}", app: nil, date: Date(timeIntervalSince1970: 1_793_491_200),
                           timeZone: TimeZone(identifier: "Asia/Tokyo")!), "2026-11-01")
 
+// Pinned before reusing the formatters (refactoring K8): the same results when time zones alternate,
+// when a placeholder repeats, and when called from many threads at once.
+let tokyo = TimeZone(identifier: "Asia/Tokyo")!
+let newYork = TimeZone(identifier: "America/New_York")!
+equal("time zones alternate: UTC", name("{date} {time}"), "2026-10-31 13.05.09")
+equal("time zones alternate: Tokyo", name("{date} {time}", timeZone: tokyo), "2026-10-31 22.05.09")
+equal("time zones alternate: New York", name("{date} {time}", timeZone: newYork), "2026-10-31 09.05.09")
+equal("time zones alternate: UTC again", name("{date} {time}"), "2026-10-31 13.05.09")
+equal("a placeholder used twice", name("{date}_{date} {time}{time}"), "2026-10-31_2026-10-31 13.05.0913.05.09")
+equal("midnight", FileNaming.baseName(template: "{date} {time}", app: nil,
+                                      date: Date(timeIntervalSince1970: 1_793_491_200), timeZone: utc),
+      "2026-11-01 00.00.00")
+var concurrentResults = [String](repeating: "", count: 400)
+let resultsLock = NSLock()
+DispatchQueue.concurrentPerform(iterations: concurrentResults.count) { i in
+    let zone = i % 2 == 0 ? utc : tokyo
+    let result = FileNaming.baseName(template: "{date} {time}", app: nil, date: date, timeZone: zone)
+    resultsLock.lock(); concurrentResults[i] = result; resultsLock.unlock()
+}
+check("many threads at once give the same names", concurrentResults.enumerated().allSatisfy { i, result in
+    result == (i % 2 == 0 ? "2026-10-31 13.05.09" : "2026-10-31 22.05.09")
+})
+
 let folder = URL(fileURLWithPath: "/tmp/karuta-check", isDirectory: true)
 func unique(_ taken: Set<String>) -> String {
     FileNaming.uniqueURL(in: folder, base: "Karuta", extension: "png") { taken.contains($0.lastPathComponent) }
