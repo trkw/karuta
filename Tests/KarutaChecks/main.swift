@@ -26,6 +26,9 @@ equal("empty app collapses the spaces", name("{app}  {date}", app: ""), "2026-10
 equal("slash and colon can't be in a file name", name("a/b:c {app}", app: "Foo/Bar"), "a-b.c Foo-Bar")
 equal("an empty result falls back to Karuta", name("{app}", app: nil), "Karuta")
 equal("text without placeholders stays", name("Screenshot"), "Screenshot")
+equal("an app name of spaces only falls back to Karuta", name("{app}", app: "   "), "Karuta")
+equal("spaces around the result are trimmed", name(" {app} {date} ", app: nil), "2026-10-31")
+equal("a colon in the app name becomes a dot", name("{app}", app: "Foo: Bar"), "Foo. Bar")
 equal("the local time zone is used", name("{date} {time}", timeZone: TimeZone(identifier: "Asia/Tokyo")!),
       "2026-10-31 22.05.09")
 equal("the next day in a time zone ahead of UTC",
@@ -63,6 +66,8 @@ func unique(_ taken: Set<String>) -> String {
 equal("a free name is used as is", unique([]), "Karuta.png")
 equal("a taken name gets (2)", unique(["Karuta.png"]), "Karuta (2).png")
 equal("(2) taken gets (3)", unique(["Karuta.png", "Karuta (2).png"]), "Karuta (3).png")
+equal("a gap in the numbers is filled", unique(["Karuta.png", "Karuta (3).png"]), "Karuta (2).png")
+equal("many taken names", unique(Set(["Karuta.png"] + (2...10).map { "Karuta (\($0)).png" })), "Karuta (11).png")
 equal("the folder is kept",
       FileNaming.uniqueURL(in: folder, base: "x", extension: "jpg") { _ in false }.deletingLastPathComponent().path,
       "/tmp/karuta-check")
