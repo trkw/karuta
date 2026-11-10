@@ -7,7 +7,7 @@
 | ID | 内容 | 効果 | リスク | 規模 | 状態 |
 |---|---|---|---|---|---|
 | K1 | ファイル名のテンプレートと ` (2)` の付け方を、AppKit に頼らない `KarutaCore` に移して確認を付ける | 中 | 低 | S | 実施済み (#40) |
-| K2 | エディタの「Save as…」(`Editor.saveAs`、シート) が `Exporter.saveAs` (モーダル) と同じ処理を別に持っている。パネルの組み立てと書き出しを 1 か所にまとめる | 中 | 低 | S | 実施済み (#PR) |
+| K2 | エディタの「Save as…」(`Editor.saveAs`、シート) が `Exporter.saveAs` (モーダル) と同じ処理を別に持っている。パネルの組み立てと書き出しを 1 か所にまとめる | 中 | 低 | S | 実施済み (#48) |
 | K3 | 一時フォルダ (`Karuta/Clipboard`・`Karuta/Recordings`・ドラッグ用の `Karuta`) の場所が `Exporter` の 3 か所にばらばらに書かれている。1 か所にまとめる | 低 | 低 | S | 未着手 |
 | K4 | 保存できなかったときの警告 (`NSAlert(error:)`) が `QuickOverlay`・`Editor`・`Exporter`・`AppDelegate` の 5 か所にある。文言と出し方を 1 つにまとめる | 低 | 低 | S | 未着手 |
 | K5 | 画像の形式 (`Preferences.ImageFormat` の拡張子と UTType) と書き出し (品質 0.9・DPI・Retina の 1x 縮小) を `KarutaCore` に移し、確認を付ける | 中 | 低〜中 | S〜M | 未着手 |
