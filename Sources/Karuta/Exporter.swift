@@ -3,6 +3,24 @@ import KarutaCore
 import ImageIO
 import UniformTypeIdentifiers
 
+/// The alert for a save that failed, shown the same way from every place that saves (docs/refactoring.md K4).
+/// Each caller keeps its own headline.
+@MainActor
+enum SaveErrorAlert {
+    /// `message` replaces the headline; nil keeps the error's own description. With `window` it's a sheet on
+    /// that window; otherwise Karuta comes to the front and shows it as a modal alert.
+    static func show(_ error: Error, message: String? = "保存できませんでした", sheetOn window: NSWindow? = nil) {
+        let alert = NSAlert(error: error)
+        if let message { alert.messageText = message }
+        if let window {
+            alert.beginSheetModal(for: window)
+        } else {
+            NSApp.activate()
+            alert.runModal()
+        }
+    }
+}
+
 enum Exporter {
     /// PNG with DPI metadata so Retina captures open at their point size (at full resolution).
     static func pngData(_ shot: Shot) -> Data? {
@@ -104,7 +122,7 @@ enum Exporter {
                 try FileManager.default.copyItem(at: video, to: url)
                 return true
             } catch {
-                NSAlert(error: error).runModal()
+                SaveErrorAlert.show(error, message: nil)
                 return false
             }
         }
@@ -115,7 +133,7 @@ enum Exporter {
             try save.write()
             return true
         } catch {
-            NSAlert(error: error).runModal()
+            SaveErrorAlert.show(error, message: nil)
             return false
         }
     }

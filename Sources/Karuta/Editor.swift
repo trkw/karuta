@@ -513,9 +513,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSTool
     }
 
     private func showError(_ error: Error) {
-        let alert = NSAlert(error: error)
-        alert.messageText = "保存できませんでした"
-        if let window { alert.beginSheetModal(for: window) }
+        if let window { SaveErrorAlert.show(error, sheetOn: window) }
     }
 
     private static func swatch(_ color: NSColor) -> NSImage {

@@ -610,10 +610,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.deliverRecording(Shot(image: thumbnail, scale: 1, app: current.app, video: url), on: current.screen)
             } catch {
                 NSLog("Karuta: finishing the recording failed: \(error)")
-                let alert = NSAlert(error: error)
-                alert.messageText = "収録を保存できませんでした"
-                NSApp.activate()
-                alert.runModal()
+                SaveErrorAlert.show(error, message: "収録を保存できませんでした")
             }
         }
     }
