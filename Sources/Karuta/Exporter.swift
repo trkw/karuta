@@ -66,7 +66,7 @@ enum Exporter {
     /// The file behind "copy as a file": in the format chosen in Settings, named from the template,
     /// in a temp folder (never the save folder). Only the latest copy is kept; older ones are removed.
     static func writeClipboardFile(_ shot: Shot) -> URL? {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("\(Bench.folderName)/Clipboard", isDirectory: true)
+        let directory = TempFolders.directory(.clipboard, folderName: Bench.folderName)
         let fileManager = FileManager.default
         if let old = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) {
             for url in old { try? fileManager.removeItem(at: url) }
@@ -124,7 +124,7 @@ enum Exporter {
     /// Each file gets its own folder, so it's named from the template without " (2)" from earlier drags.
     static func writeTemporary(_ shot: Shot) -> URL? {
         if let video = shot.video { return video }
-        let parent = FileManager.default.temporaryDirectory.appendingPathComponent("\(Bench.folderName)/Drag", isDirectory: true)
+        let parent = TempFolders.directory(.drag, folderName: Bench.folderName)
         guard let directory = try? TempFolders.fresh(in: parent) else { return nil }
         return try? save(shot, in: directory)
     }
@@ -132,7 +132,7 @@ enum Exporter {
     /// From the template in Settings, e.g. "Karuta 2026-10-31 13.05.09.png".
     /// Where recordings are written while they're in Quick Access (cleared by the system like any temp file).
     static var recordingsDirectory: URL {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("\(Bench.folderName)/Recordings", isDirectory: true)
+        let directory = TempFolders.directory(.recordings, folderName: Bench.folderName)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }

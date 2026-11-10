@@ -81,5 +81,33 @@ _ = try! TempFolders.fresh(in: parent)
 check("folders older than an hour are removed", !FileManager.default.fileExists(atPath: stale.path))
 check("recent folders stay", FileManager.default.fileExists(atPath: first.path))
 
+// The one-hour rule, pinned at its edges (K3): 59 minutes stays, 61 minutes goes
+let edge = FileManager.default.temporaryDirectory.appendingPathComponent("karuta-check-\(UUID().uuidString)")
+defer { try? FileManager.default.removeItem(at: edge) }
+let now = Date()
+func aged(_ name: String, minutes: Double) -> URL {
+    let url = edge.appendingPathComponent(name, isDirectory: true)
+    try! FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    try! FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(-minutes * 60)], ofItemAtPath: url.path)
+    return url
+}
+let young = aged("young", minutes: 59)
+let old = aged("old", minutes: 61)
+let made = try! TempFolders.fresh(in: edge, now: now)
+check("59 minutes old stays", FileManager.default.fileExists(atPath: young.path))
+check("61 minutes old is removed", !FileManager.default.fileExists(atPath: old.path))
+check("the new folder is inside the parent", made.deletingLastPathComponent().standardizedFileURL.path == edge.standardizedFileURL.path)
+
+// Where the temp folders are (K3). The literal paths are the ones Exporter wrote inline before
+let base = URL(fileURLWithPath: "/tmp/karuta-base", isDirectory: true)
+equal("app folder name", TempFolders.folderName(bench: false), "Karuta")
+equal("bench folder name", TempFolders.folderName(bench: true), "Karuta Bench")
+equal("clipboard folder", TempFolders.directory(.clipboard, folderName: "Karuta", base: base).path, "/tmp/karuta-base/Karuta/Clipboard")
+equal("drag folder", TempFolders.directory(.drag, folderName: "Karuta", base: base).path, "/tmp/karuta-base/Karuta/Drag")
+equal("recordings folder", TempFolders.directory(.recordings, folderName: "Karuta", base: base).path, "/tmp/karuta-base/Karuta/Recordings")
+equal("bench clipboard folder", TempFolders.directory(.clipboard, folderName: "Karuta Bench", base: base).path, "/tmp/karuta-base/Karuta Bench/Clipboard")
+check("same URL as the old inline expression",
+      TempFolders.directory(.drag, folderName: "Karuta Bench") == FileManager.default.temporaryDirectory.appendingPathComponent("Karuta Bench/Drag", isDirectory: true))
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
