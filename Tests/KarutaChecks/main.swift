@@ -81,5 +81,22 @@ _ = try! TempFolders.fresh(in: parent)
 check("folders older than an hour are removed", !FileManager.default.fileExists(atPath: stale.path))
 check("recent folders stay", FileManager.default.fileExists(atPath: first.path))
 
+// The one-hour rule, pinned at its edges (K3): 59 minutes stays, 61 minutes goes
+let edge = FileManager.default.temporaryDirectory.appendingPathComponent("karuta-check-\(UUID().uuidString)")
+defer { try? FileManager.default.removeItem(at: edge) }
+let now = Date()
+func aged(_ name: String, minutes: Double) -> URL {
+    let url = edge.appendingPathComponent(name, isDirectory: true)
+    try! FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    try! FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(-minutes * 60)], ofItemAtPath: url.path)
+    return url
+}
+let young = aged("young", minutes: 59)
+let old = aged("old", minutes: 61)
+let made = try! TempFolders.fresh(in: edge, now: now)
+check("59 minutes old stays", FileManager.default.fileExists(atPath: young.path))
+check("61 minutes old is removed", !FileManager.default.fileExists(atPath: old.path))
+check("the new folder is inside the parent", made.deletingLastPathComponent().standardizedFileURL.path == edge.standardizedFileURL.path)
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
