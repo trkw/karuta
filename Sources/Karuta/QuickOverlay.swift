@@ -112,10 +112,7 @@ final class QuickOverlay {
     }
 
     static func showSaveError(_ error: Error) {
-        let alert = NSAlert(error: error)
-        alert.messageText = "保存できませんでした"
-        NSApp.activate()
-        alert.runModal()
+        SaveErrorAlert.show(error)
     }
 
     /// Where a card sits: just inside its side of the screen, or (hidden) just past that edge.
