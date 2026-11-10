@@ -108,16 +108,11 @@ enum Exporter {
                 return false
             }
         }
-        let format = Preferences.format
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [format.utType]
-        panel.directoryURL = Preferences.saveDirectory
-        panel.nameFieldStringValue = defaultFileName(extension: format.fileExtension, app: shot.app)
+        let save = ImageSavePanel(shot: shot)
         NSApp.activate()
-        guard panel.runModal() == .OK, let url = panel.url else { return false }
+        guard save.panel.runModal() == .OK else { return false }
         do {
-            guard let data = fileData(shot, format: format) else { throw CocoaError(.fileWriteUnknown) }
-            try data.write(to: url)
+            try save.write()
             return true
         } catch {
             NSAlert(error: error).runModal()
@@ -163,5 +158,48 @@ enum Exporter {
 
     private static func uniqueURL(in directory: URL, extension ext: String, app: String?) -> URL {
         FileNaming.uniqueURL(in: directory, base: baseName(app: app), extension: ext)
+    }
+}
+
+/// The "別名で保存" panel for an image, shared by the quick overlay, pins, history and the editor: it starts in the save
+/// folder with the template name, and a 形式 menu (PNG・JPEG・HEIC) picks the format for this file only.
+/// The menu starts at the format chosen in Settings; choosing another one doesn't change the setting.
+@MainActor
+final class ImageSavePanel: NSObject {
+    let panel = NSSavePanel()
+    private(set) var format: Preferences.ImageFormat
+    private let shot: Shot
+    private let menu = NSPopUpButton(frame: .zero, pullsDown: false)
+
+    init(shot: Shot) {
+        self.shot = shot
+        format = Preferences.format
+        super.init()
+        panel.allowedContentTypes = [format.utType]
+        panel.directoryURL = Preferences.saveDirectory
+        panel.nameFieldStringValue = Exporter.defaultFileName(extension: format.fileExtension, app: shot.app)
+        menu.addItems(withTitles: Preferences.ImageFormat.allCases.map(\.title))
+        menu.selectItem(at: Preferences.ImageFormat.allCases.firstIndex(of: format) ?? 0)
+        menu.target = self
+        menu.action = #selector(formatChanged)
+        let row = NSStackView(views: [NSTextField(labelWithString: "形式:"), menu])
+        row.spacing = 8
+        row.edgeInsets = NSEdgeInsets(top: 8, left: 16, bottom: 8, right: 16)
+        panel.accessoryView = row
+    }
+
+    @objc private func formatChanged() {
+        format = Preferences.ImageFormat.allCases[menu.indexOfSelectedItem]
+        panel.allowedContentTypes = [format.utType]
+        let base = (panel.nameFieldStringValue as NSString).deletingPathExtension
+        panel.nameFieldStringValue = "\(base).\(format.fileExtension)"
+    }
+
+    /// Writes the image in the chosen format to the chosen place (after the panel returned OK).
+    func write() throws {
+        guard let url = panel.url, let data = Exporter.fileData(shot, format: format) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        try data.write(to: url)
     }
 }
