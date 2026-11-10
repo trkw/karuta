@@ -11,7 +11,7 @@ jobs:
   build:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Checks
         run: make test
       # 鍵が登録されていれば Developer ID で署名・公証する。無ければ（fork からの PR など）ad-hoc 署名のまま（docs/signing.md）
@@ -23,7 +23,7 @@ jobs:
           APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
           APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
         run: scripts/sign-and-notarize.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Karuta
           path: build/*.dmg
