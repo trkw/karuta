@@ -13,4 +13,4 @@
 | K5 | 画像の形式 (`Preferences.ImageFormat` の拡張子と UTType) と書き出し (品質 0.9・DPI・Retina の 1x 縮小) を `KarutaCore` に移し、確認を付ける | 中 | 低〜中 | S〜M | 未着手 |
 | K6 | 大きいファイルを、中身を変えずに分ける: `SettingsWindow.swift` (約 900 行)・`SelectionOverlay.swift`・`Editor.swift`・`AppDelegate.swift`・`QuickOverlay.swift` (各 700 行前後) | 中 | 低 | M | 未着手 |
 | K7 | `Preferences` の UserDefaults のキーが文字列で 20 か所ほどに散らばっている。キーを 1 つの型にまとめる (保存されている値と名前は変えない) | 低〜中 | 低 | S | 未着手 |
-| K8 | ファイル名を作るたびに `DateFormatter` を作り直している (`FileNaming.baseName`・`History`)。使い回す | 低 | 低 | S | 未着手 |
+| K8 | ファイル名を作るたびに `DateFormatter` を作り直している (`FileNaming.baseName`・`History`)。使い回す | 低 | 低 | S | 実施済み (#47) |
