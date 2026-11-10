@@ -128,7 +128,7 @@ open "karuta://pin?filepath=~/Desktop/image.png"
 
 ## ビルド
 
-Xcode（またはコマンドラインツール）が入った Mac で（Nix があれば `nix develop` か direnv で gh・jq・shellcheck の入った開発用のシェルに入れる。Swift と SDK は Apple のものをそのまま使い、コマンドラインツールだけのときは SDK 26 を選ぶ）:
+Xcode（またはコマンドラインツール）が入った Mac で（Nix があれば `nix develop` か direnv で gh・jq・shellcheck・rsvg-convert・pngquant の入った開発用のシェルに入れる。Swift と SDK は Apple のものをそのまま使い、コマンドラインツールだけのときは SDK 26 を選ぶ）:
 
 ```sh
 make run       # build/Karuta.app を作って起動
@@ -150,7 +150,7 @@ make install SIGN_IDENTITY="Karuta Dev"
 
 ### アイコン
 
-アプリアイコンの元データは `Support/AppIcon.svg` です。変更したら `make icon`（要 `brew install librsvg`、あると小さくなる `pngquant`）で `Support/AppIcon.icns` を作り直してコミットしてください。メニューバーのアイコンは SF Symbols の `rectangle.dashed` です。
+アプリアイコンの元データは `Support/AppIcon.svg` です。変更したら、`nix develop` の開発用シェル（`rsvg-convert` と `pngquant` が入っている）で `make icon` を実行して `Support/AppIcon.icns` を作り直してコミットしてください。メニューバーのアイコンは SF Symbols の `rectangle.dashed` です。
 
 ## DMG で配布する
 

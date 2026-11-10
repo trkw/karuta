@@ -22,6 +22,9 @@
             pkgs.gh
             pkgs.jq
             pkgs.shellcheck
+            # make icon (scripts/make-icns.sh): rsvg-convert renders the SVG, pngquant makes the PNGs smaller
+            pkgs.librsvg
+            pkgs.pngquant
           ];
           shellHook = ''
             # Swift is Apple's (/usr/bin/swift; this shell adds no compiler). Use the SDK 26 of the Command
