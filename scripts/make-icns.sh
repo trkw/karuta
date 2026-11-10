@@ -1,11 +1,11 @@
 #!/bin/sh
 # Support/AppIcon.svg から Support/AppIcon.icns を作り直す（macOS 用）
-# 必要なもの: rsvg-convert（brew install librsvg）と iconutil（標準）
-# pngquant（brew install pngquant）があれば減色してサイズを小さくする
+# 必要なもの: rsvg-convert（nix develop の開発用シェルに入っている）と iconutil（標準）
+# pngquant（同じく開発用シェルに入っている）があれば減色してサイズを小さくする
 set -eu
 cd "$(dirname "$0")/.."
 
-command -v rsvg-convert >/dev/null || { echo "rsvg-convert がありません: brew install librsvg" >&2; exit 1; }
+command -v rsvg-convert >/dev/null || { echo "rsvg-convert がありません: nix develop の開発用シェルで実行する" >&2; exit 1; }
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
