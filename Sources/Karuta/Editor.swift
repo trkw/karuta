@@ -479,17 +479,11 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSTool
 
     @objc private func saveAs() {
         guard let window else { return }
-        let format = Preferences.format
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [format.utType]
-        panel.directoryURL = Preferences.saveDirectory
-        let shot = canvas.renderedShot()
-        panel.nameFieldStringValue = Exporter.defaultFileName(extension: format.fileExtension, app: shot.app)
-        panel.beginSheetModal(for: window) { [weak self] response in
-            guard response == .OK, let url = panel.url else { return }
+        let save = ImageSavePanel(shot: canvas.renderedShot())
+        save.panel.beginSheetModal(for: window) { [weak self] response in
+            guard response == .OK else { return }
             do {
-                guard let data = Exporter.fileData(shot, format: format) else { throw CocoaError(.fileWriteUnknown) }
-                try data.write(to: url)
+                try save.write()
                 self?.close()
             } catch {
                 self?.showError(error)
