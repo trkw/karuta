@@ -18,13 +18,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let selection = SelectionController()
     let overlay = QuickOverlay()
     private var editors: [EditorWindowController] = []
-    private var pins: [PinWindow] = []
+    var pins: [PinWindow] = []
     /// The last area selection, relative to its display's origin (so it survives display rearrangement),
     /// for "前回の範囲を撮影".
     private var lastArea: (rect: CGRect, displayID: CGDirectDisplayID)?
     var isCapturing = false
-    private var settings: SettingsWindowController?
-    private var history: HistoryWindowController?
+    var settings: SettingsWindowController?
+    var history: HistoryWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setUpStatusItem()
@@ -134,7 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Shortcuts come from Settings (default ⌘⇧3 / ⌘⇧4 / ⌘⇧5 like CleanShot; turn off the macOS ones).
-    private func registerHotKeys() {
+    func registerHotKeys() {
         let hotKeys = HotKeyCenter.shared
         hotKeys.unregisterAll()
         // The bench copy (scripts/make-bench-copy.sh) runs next to the real Karuta for checks; it must not
@@ -148,86 +148,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // MARK: - Actions
-
-    private func perform(_ action: ShortcutAction) {
-        switch action {
-        case .allInOne: capture(.allInOne)
-        case .area: capture(.area)
-        case .window: capture(.window)
-        case .fullscreen: capture(.fullscreen)
-        case .previousArea: capture(.previousArea)
-        case .selfTimer: capture(.selfTimer)
-        case .scrollingCapture: scrollingCapture()
-        case .recordScreen: toggleRecording()
-        case .areaCopy: capture(.area, delivery: .copy)
-        case .areaSave: capture(.area, delivery: .save)
-        case .areaAnnotate: capture(.area, delivery: .annotate)
-        case .areaPin: capture(.area, delivery: .pin)
-        case .openClipboard:
-            guard let shot = ImageLoader.shotFromPasteboard() else {
-                NSSound.beep()
-                return
-            }
-            openEditor(shot)
-        case .openFile:
-            if let shot = ImageLoader.chooseImage(prompt: "編集") { openEditor(shot) }
-        case .pinFile:
-            // Centred on the screen under the mouse.
-            if let shot = ImageLoader.chooseImage(prompt: "ピン留め") { pin(shot, near: NSScreen.underMouse.visibleFrame) }
-        case .restoreClosed:
-            if !overlay.restoreClosed(on: NSScreen.underMouse) { NSSound.beep() }
-        case .openHistory: openHistory()
-        case .togglePins:
-            // Hide them all if any is showing, otherwise bring them all back.
-            let anyVisible = pins.contains { $0.isVisible }
-            pins.forEach { anyVisible ? $0.orderOut(nil) : $0.orderFrontRegardless() }
-        case .unlockPins: pins.forEach { $0.isLocked = false }
-        case .closeAllPins: let all = pins; all.forEach { $0.close() }
-        case .toggleOverlays: overlay.toggleHidden()
-        case .saveAllOverlays: overlay.saveAll()
-        case .closeAllOverlays: overlay.closeAll()
-        }
-    }
-
-    private func openHistory() {
-        if history == nil {
-            let controller = HistoryWindowController()
-            controller.onEdit = { [weak self] shot in self?.openEditor(shot) }
-            controller.onPin = { [weak self] shot in self?.pin(shot, near: NSScreen.underMouse.visibleFrame) }
-            controller.onOverlay = { [weak self] shot in self?.overlay.show(shot, on: NSScreen.underMouse) }
-            controller.onClose = { [weak self] in self?.history = nil }
-            history = controller
-        }
-        NSApp.activate()
-        history?.showWindow(nil)
-        history?.window?.makeKeyAndOrderFront(nil)
-    }
-
-    @objc private func openSettings() {
-        showSettings(nil)
-    }
-
-    private func showSettings(_ page: SettingsPage?) {
-        if settings == nil {
-            let controller = SettingsWindowController()
-            controller.onClose = { [weak self] in self?.settings = nil }
-            controller.onRecordingShortcut = { [weak self] recording in
-                // Pause global hot keys so the combination being recorded reaches the field.
-                if recording { HotKeyCenter.shared.unregisterAll() } else { self?.registerHotKeys() }
-            }
-            settings = controller
-        }
-        if let page { settings?.select(page) }
-        NSApp.activate()
-        settings?.showWindow(nil)
-        settings?.window?.makeKeyAndOrderFront(nil)
-    }
+    // MARK: - Actions (in AppDelegate+Actions.swift)
 
     // MARK: - Capture
 
     /// `initial` overrides All-In-One's starting area (normally the previous one).
-    private func capture(_ mode: CaptureMode, delivery: Delivery = .settings, initial: CGRect? = nil) {
+    func capture(_ mode: CaptureMode, delivery: Delivery = .settings, initial: CGRect? = nil) {
         guard !isCapturing else { return }
         isCapturing = true
         // Before the selection overlay brings Karuta forward: the app being captured, for the file name.
@@ -393,7 +319,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let saveError { QuickOverlay.showSaveError(saveError) }
     }
 
-    private func pin(_ shot: Shot, near frame: NSRect) {
+    func pin(_ shot: Shot, near frame: NSRect) {
         let window = PinWindow(shot: shot, frame: frame)
         window.onClose = { [weak self, weak window] in
             self?.pins.removeAll { $0 === window }
@@ -404,7 +330,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.orderFrontRegardless()
     }
 
-    private func openEditor(_ shot: Shot, background: Bool = false) {
+    func openEditor(_ shot: Shot, background: Bool = false) {
         let editor = EditorWindowController(shot: shot, background: background)
         editor.onDone = { [weak self] edited in self?.overlay.show(edited, on: NSScreen.underMouse) }
         editor.onPin = { [weak self] edited, frame in self?.pin(edited, near: frame) }
