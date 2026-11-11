@@ -17,6 +17,17 @@ public enum FileNaming {
         return name.isEmpty ? "Karuta" : name
     }
 
+    /// The extensions the image formats use (and "jpeg", which people type by hand).
+    static let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "heic"]
+
+    /// `name` with its image extension swapped for `ext` (the Save As panel's 形式 menu). Only a known image
+    /// extension is removed, so the dots of `{time}` (13.05.09) or "v1.2" stay when the extension isn't shown.
+    public static func replacingImageExtension(of name: String, with ext: String) -> String {
+        let current = (name as NSString).pathExtension
+        let base = imageExtensions.contains(current.lowercased()) ? (name as NSString).deletingPathExtension : name
+        return "\(base).\(ext)"
+    }
+
     /// `<base>.<ext>` in `directory`, or `<base> (2).<ext>`, `<base> (3).<ext>`… if that exists.
     public static func uniqueURL(in directory: URL, base: String, extension ext: String,
                                  exists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }) -> URL {

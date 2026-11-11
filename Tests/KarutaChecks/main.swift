@@ -72,6 +72,19 @@ equal("the folder is kept",
       FileNaming.uniqueURL(in: folder, base: "x", extension: "jpg") { _ in false }.deletingLastPathComponent().path,
       "/tmp/karuta-check")
 
+// The Save As panel's 形式 menu: only an image extension is swapped, so dots in the name stay
+func swapped(_ name: String, _ ext: String) -> String { FileNaming.replacingImageExtension(of: name, with: ext) }
+equal("png to jpg", swapped("Karuta 2026-10-31 13.05.09.png", "jpg"), "Karuta 2026-10-31 13.05.09.jpg")
+equal("jpg to heic", swapped("Karuta 2026-10-31 13.05.09.jpg", "heic"), "Karuta 2026-10-31 13.05.09.heic")
+equal("heic to png", swapped("memo.heic", "png"), "memo.png")
+equal("jpeg typed by hand", swapped("memo.jpeg", "png"), "memo.png")
+equal("upper-case extension", swapped("memo.PNG", "jpg"), "memo.jpg")
+equal("no extension keeps the time's dots", swapped("Karuta 2026-10-31 13.05.09", "jpg"), "Karuta 2026-10-31 13.05.09.jpg")
+equal("a version number stays", swapped("design v1.2", "png"), "design v1.2.png")
+equal("another extension stays", swapped("notes.txt", "png"), "notes.txt.png")
+equal("only the last extension", swapped("a.png.png", "jpg"), "a.png.jpg")
+equal("an empty name", swapped("", "png"), ".png")
+
 // Temp folders for drag & drop
 let parent = FileManager.default.temporaryDirectory.appendingPathComponent("karuta-check-\(UUID().uuidString)")
 defer { try? FileManager.default.removeItem(at: parent) }

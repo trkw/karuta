@@ -209,8 +209,7 @@ final class ImageSavePanel: NSObject {
     @objc private func formatChanged() {
         format = Preferences.ImageFormat.allCases[menu.indexOfSelectedItem]
         panel.allowedContentTypes = [format.utType]
-        let base = (panel.nameFieldStringValue as NSString).deletingPathExtension
-        panel.nameFieldStringValue = "\(base).\(format.fileExtension)"
+        panel.nameFieldStringValue = FileNaming.replacingImageExtension(of: panel.nameFieldStringValue, with: format.fileExtension)
     }
 
     /// Writes the image in the chosen format to the chosen place (after the panel returned OK).
