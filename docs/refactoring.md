@@ -16,4 +16,4 @@
 | K8 | ファイル名を作るたびに `DateFormatter` を作り直している (`FileNaming.baseName`・`History`)。使い回す | 低 | 低 | S | 実施済み (#47) |
 | K9 | クリーンビルドで出る既存のコンパイラの警告 6 件を消す (AppDelegate+Recording.swift 2・Editor.swift 2・QuickOverlay.swift 2。クロージャでの self の捕まえ方と、メインアクターの値を Sendable なクロージャから読む箇所)。動きは変えない | 中 (新しい警告に気づける、Swift 6 の厳密な検査で止まらない) | 低〜中 (並行性に触れるので 1 件ずつ) | S | 実施済み (#68, devcycle-20261112-1048) |
 | K10 | `Canvas.swift` (650 行) を MARK の節 (History・Looks・Edits・Geometry・Drawing・Mouse・Keyboard・Text) ごとの extension のファイルに分ける (中身は変えない) | 中 | 低 | M | 未着手 |
-| K11 | `Annotation.swift` (606 行) から、描き出し (`AnnotationRenderer`、約 260 行) と見た目の種類 (`ArrowStyle`・`TextStyle`・`PixelateStyle`・`CounterStyle`) と `Backdrop` を別のファイルに分ける (中身は変えない) | 中 | 低 | M | 未着手 |
+| K11 | `Annotation.swift` (606 行) から、描き出し (`AnnotationRenderer`、約 260 行) と見た目の種類 (`ArrowStyle`・`TextStyle`・`PixelateStyle`・`CounterStyle`) と `Backdrop` を別のファイルに分ける (中身は変えない) | 中 | 低 | M | 実施済み (refill-20261112-1555-karuta。AnnotationRenderer.swift・AnnotationStyles.swift・Backdrop.swift に分けた。中身は同じ) |
