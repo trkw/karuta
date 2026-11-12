@@ -209,8 +209,11 @@ final class QuickOverlay {
             }
         }, completionHandler: { [weak self] in
             // Off-screen isn't enough: a display to the left would show them. Take them off screen entirely.
-            guard let self, self.isStackHidden else { return }
-            self.cards.forEach { $0.orderOut(nil) }
+            // AppKit calls this on the main thread.
+            MainActor.assumeIsolated {
+                guard let self, self.isStackHidden else { return }
+                self.cards.forEach { $0.orderOut(nil) }
+            }
         })
     }
 }

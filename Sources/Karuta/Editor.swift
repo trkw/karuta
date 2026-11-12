@@ -267,7 +267,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSTool
         let current = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         current.image = Self.swatch(canvas.color)
         menu.addItem(current) // a pull-down's first item is its button face
-        let addColor = { (color: NSColor) in
+        let addColor = { [weak self] (color: NSColor) in
             menu.addItem(MenuAction(title: "") { [weak self] in self?.choose(color) })
             menu.items.last?.image = Self.swatch(color)
         }
@@ -281,7 +281,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSTool
         menu.addItem(MenuAction(title: "画面から色を取る…") { [weak self] in
             NSColorSampler().show { color in
                 guard let color else { return }
-                self?.choose(color)
+                // The sampler calls this on the main thread.
+                MainActor.assumeIsolated { self?.choose(color) }
             }
         })
         menu.addItem(MenuAction(title: "ほかの色…") { [weak self] in self?.showColorPanel() })
