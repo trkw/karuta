@@ -9,10 +9,8 @@
   outputs =
     { nixpkgs, ... }:
     let
-      systems = [
-        "aarch64-darwin"
-        "x86_64-darwin"
-      ];
+      # Apple silicon only: nixpkgs 26.11 dropped x86_64-darwin, so its devShell no longer evaluates.
+      systems = [ "aarch64-darwin" ];
       forAll = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
     in
     {
