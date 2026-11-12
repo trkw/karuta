@@ -1,5 +1,6 @@
 import AppKit
 import ImageIO
+import KarutaCore
 
 /// Capture History, like CleanShot's: every capture is kept as a PNG in Application Support for the number
 /// of days chosen in Settings, so it can be copied, edited, pinned or brought back later.
@@ -69,7 +70,7 @@ enum CaptureHistory {
                     return
                 }
                 // Encodes can finish out of order (a big fullscreen after a small area); keep newest first.
-                items.insert(item, at: items.firstIndex { $0.date < item.date } ?? items.count)
+                items.insert(item, at: HistoryRules.insertionIndex(for: item.date, in: items.map(\.date)))
                 prune()
                 save()
             }
@@ -79,9 +80,9 @@ enum CaptureHistory {
     /// Drops what is older than the retention period (and everything when history is off).
     static func prune() {
         let days = Preferences.historyDays
-        let cutoff = Date().addingTimeInterval(-Double(days) * 86_400)
+        let now = Date()
         if days <= 0 { generation += 1 }
-        let expired = items.filter { days <= 0 || $0.date < cutoff }
+        let expired = items.filter { HistoryRules.isExpired($0.date, days: days, now: now) }
         guard !expired.isEmpty else { return }
         remove(expired)
     }

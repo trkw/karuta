@@ -143,5 +143,22 @@ for (key, stored) in zip(PreferenceKey.allCases, storedKeys) {
 equal("editor style key", PreferenceKey.editorStyle("arrow"), "editorStyle.arrow")
 equal("shortcut key", PreferenceKey.shortcut("area"), "shortcut.area")
 
+// MARK: History (K13): what has expired, and where a capture goes in the newest-first list.
+
+let historyNow = Date(timeIntervalSince1970: 1_800_000_000)
+let day: TimeInterval = 86_400
+check("history off: everything has expired", HistoryRules.isExpired(historyNow, days: 0, now: historyNow))
+check("negative days: everything has expired", HistoryRules.isExpired(historyNow, days: -1, now: historyNow))
+check("inside the period stays", !HistoryRules.isExpired(historyNow - 30 * day + 1, days: 30, now: historyNow))
+check("exactly at the cutoff stays", !HistoryRules.isExpired(historyNow - 30 * day, days: 30, now: historyNow))
+check("a second past the cutoff has expired", HistoryRules.isExpired(historyNow - 30 * day - 1, days: 30, now: historyNow))
+check("one day keeps today", !HistoryRules.isExpired(historyNow - 3600, days: 1, now: historyNow))
+let listed = [historyNow, historyNow - 10, historyNow - 20]  // newest first
+equal("into an empty list", "\(HistoryRules.insertionIndex(for: historyNow, in: []))", "0")
+equal("newer than all goes first", "\(HistoryRules.insertionIndex(for: historyNow + 5, in: listed))", "0")
+equal("in between goes in its place", "\(HistoryRules.insertionIndex(for: historyNow - 15, in: listed))", "2")
+equal("older than all goes last", "\(HistoryRules.insertionIndex(for: historyNow - 99, in: listed))", "3")
+equal("the same time goes after the existing one", "\(HistoryRules.insertionIndex(for: historyNow - 10, in: listed))", "2")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
