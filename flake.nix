@@ -14,6 +14,9 @@
       forAll = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
     in
     {
+      # `nix fmt` formats flake.nix; the Nix workflow runs `nixfmt --check`.
+      formatter = forAll (pkgs: pkgs.nixfmt);
+
       devShells = forAll (pkgs: {
         default = pkgs.mkShellNoCC {
           packages = [
