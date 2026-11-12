@@ -1,0 +1,30 @@
+name: Nix
+
+# Checks the flake (the dev shell), its formatting and the shell scripts. The build and release
+# workflows don't use Nix and are unchanged. The flake is Apple silicon only, so on Ubuntu flake check
+# evaluates it (--all-systems) without building.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nix-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31.11.5
+      - name: nix flake check
+        run: nix flake check --all-systems --no-build
+      - name: nixfmt
+        run: nix run nixpkgs#nixfmt -- --check flake.nix
+      - name: shellcheck
+        run: git ls-files -z '*.sh' | xargs -0 nix run nixpkgs#shellcheck -- -x -P SCRIPTDIR
