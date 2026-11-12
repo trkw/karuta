@@ -106,7 +106,7 @@ final class CanvasView: NSView, NSTextFieldDelegate {
     }
     var onStateChange: (() -> Void)?
 
-    private(set) var annotations: [Annotation] = [] { didSet { needsDisplay = true } }
+    var annotations: [Annotation] = [] { didSet { needsDisplay = true } }
     /// Undo keeps the picture too, so rotating and flipping can be undone.
     private struct Snapshot {
         var annotations: [Annotation]
@@ -117,20 +117,20 @@ final class CanvasView: NSView, NSTextFieldDelegate {
     private var undoStack: [Snapshot] = []
     private var redoStack: [Snapshot] = []
     /// The next counter's number when typed in; otherwise it follows the highest one on the picture.
-    private var counterOverride: Int?
-    private var preview: Annotation? { didSet { needsDisplay = true } }
-    private var crop: NSRect? { didSet { needsDisplay = true } }
-    private var selected: Int? {
+    var counterOverride: Int?
+    var preview: Annotation? { didSet { needsDisplay = true } }
+    var crop: NSRect? { didSet { needsDisplay = true } }
+    var selected: Int? {
         didSet {
             needsDisplay = true
             if selected != oldValue { onStateChange?() } // the toolbar shows the selected mark's look
         }
     }
 
-    private var dragStart: NSPoint?
-    private var lastDrag: NSPoint?
-    private var textField: NSTextField?
-    private var textOrigin: NSPoint = .zero
+    var dragStart: NSPoint?
+    var lastDrag: NSPoint?
+    var textField: NSTextField?
+    var textOrigin: NSPoint = .zero
 
     var isEditingText: Bool { textField != nil }
     var canUndo: Bool { !undoStack.isEmpty }
@@ -159,7 +159,7 @@ final class CanvasView: NSView, NSTextFieldDelegate {
 
     private var snapshot: Snapshot { Snapshot(annotations: annotations, renderer: renderer, crop: crop) }
 
-    private func commit(_ new: [Annotation]) {
+    func commit(_ new: [Annotation]) {
         undoStack.append(snapshot)
         redoStack.removeAll()
         annotations = new
@@ -245,7 +245,7 @@ final class CanvasView: NSView, NSTextFieldDelegate {
 
     /// A new mark in the current color, width and look. `tool` is the tool that made it, when that may
     /// no longer be the current one (text is committed after switching tools).
-    private func mark(_ kind: Annotation.Kind, by tool: Tool? = nil) -> Annotation {
+    func mark(_ kind: Annotation.Kind, by tool: Tool? = nil) -> Annotation {
         Annotation(kind: kind, color: color, width: lineWidth, style: style(for: tool ?? self.tool))
     }
 
@@ -314,8 +314,8 @@ final class CanvasView: NSView, NSTextFieldDelegate {
 
     // MARK: Geometry
 
-    private var fullRect: NSRect { NSRect(origin: .zero, size: renderer.size) }
-    private var editingCrop: Bool { tool == .crop }
+    var fullRect: NSRect { NSRect(origin: .zero, size: renderer.size) }
+    var editingCrop: Bool { tool == .crop }
     /// The part of the image shown (the crop, unless the crop itself is being edited).
     private var shownArea: NSRect { editingCrop ? fullRect : (crop ?? fullRect) }
     private var padding: CGFloat { background && !editingCrop ? Backdrop.padding(for: shownArea.size) : 0 }
@@ -347,7 +347,7 @@ final class CanvasView: NSView, NSTextFieldDelegate {
         needsDisplay = true
     }
 
-    private func viewPoint(_ p: NSPoint) -> NSPoint {
+    func viewPoint(_ p: NSPoint) -> NSPoint {
         let doc = documentRect
         return NSPoint(x: doc.minX + (padding + p.x - shownArea.minX) * zoom,
                        y: doc.minY + (padding + p.y - shownArea.minY) * zoom)
@@ -358,7 +358,7 @@ final class CanvasView: NSView, NSTextFieldDelegate {
         return NSRect(x: origin.x, y: origin.y, width: r.width * zoom, height: r.height * zoom)
     }
 
-    private func imagePoint(for event: NSEvent, clamp: Bool = true) -> NSPoint {
+    func imagePoint(for event: NSEvent, clamp: Bool = true) -> NSPoint {
         let v = convert(event.locationInWindow, from: nil)
         let doc = documentRect
         var p = NSPoint(x: (v.x - doc.minX) / zoom - padding + shownArea.minX,
@@ -444,207 +444,9 @@ final class CanvasView: NSView, NSTextFieldDelegate {
         text.draw(at: NSPoint(x: box.minX + 6, y: box.minY + 2), withAttributes: attributes)
     }
 
-    // MARK: Mouse
+    // MARK: Mouse (in CanvasView+Mouse.swift)
 
-    override func mouseDown(with event: NSEvent) {
-        commitText()
-        window?.makeFirstResponder(self)
-        let p = imagePoint(for: event)
-        dragStart = p
-        lastDrag = p
-        switch tool {
-        case .select:
-            let tolerance = 6 / zoom
-            selected = annotations.indices.reversed().first { annotations[$0].hitTest(p, tolerance: tolerance) }
-            if let index = selected {
-                var list = annotations
-                if event.modifierFlags.contains(.option) {
-                    // Option-drag duplicates, like CleanShot.
-                    list.append(list[index])
-                    selected = list.count - 1
-                }
-                commit(list)
-            }
-        case .text:
-            beginText(at: p)
-            dragStart = nil
-        case .counter:
-            let next = nextCounter
-            counterOverride = nil
-            commit(annotations + [mark(.counter(p, next))])
-            dragStart = nil
-        case .pen, .highlighter:
-            preview = mark(tool == .pen ? .pen([p]) : .highlighter([p]))
-        default:
-            break
-        }
-    }
+    // MARK: Keyboard (in CanvasView+Keyboard.swift)
 
-    override func mouseDragged(with event: NSEvent) {
-        guard let start = dragStart else { return }
-        let p = imagePoint(for: event)
-        let shift = event.modifierFlags.contains(.shift)
-        defer { lastDrag = p }
-
-        switch tool {
-        case .select:
-            guard let index = selected, let last = lastDrag else { return }
-            var list = annotations
-            list[index] = list[index].offsetBy(dx: p.x - last.x, dy: p.y - last.y)
-            annotations = list // one undo step for the whole move (recorded on mouseDown)
-        case .crop:
-            crop = Self.rect(from: start, to: p, square: shift).intersection(fullRect)
-        case .rect, .filledRect, .ellipse, .pixelate, .blur, .spotlight:
-            let r = Self.rect(from: start, to: p, square: shift)
-            let kind: Annotation.Kind = switch tool {
-            case .rect: .rect(r)
-            case .filledRect: .filledRect(r)
-            case .ellipse: .ellipse(r)
-            case .pixelate: .pixelate(r)
-            case .blur: .blur(r)
-            default: .spotlight(r)
-            }
-            preview = mark(kind)
-        case .line, .arrow:
-            let end = shift ? Self.snap(p, from: start) : p
-            preview = mark(tool == .line ? .line(start, end) : .arrow(start, end))
-        case .pen, .highlighter:
-            guard var current = preview else { return }
-            switch current.kind {
-            case let .pen(points): current.kind = .pen(points + [p])
-            case let .highlighter(points): current.kind = .highlighter(points + [p])
-            default: break
-            }
-            preview = current
-        case .text, .counter:
-            break
-        }
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        defer {
-            dragStart = nil
-            lastDrag = nil
-            preview = nil
-        }
-        if tool == .crop, let crop, crop.width < 4 || crop.height < 4 {
-            self.crop = nil
-            return
-        }
-        guard let preview else { return }
-        let box = preview.bounds
-        switch preview.kind {
-        case let .line(a, b), let .arrow(a, b):
-            guard hypot(b.x - a.x, b.y - a.y) >= 4 else { return }
-        case .pen, .highlighter:
-            break
-        default:
-            guard box.width >= 4, box.height >= 4 else { return }
-        }
-        commit(annotations + [preview])
-    }
-
-    static let widthSteps: [CGFloat] = [1, 2, 4, 6, 8, 12]
-
-    private static func rect(from a: NSPoint, to b: NSPoint, square: Bool) -> NSRect {
-        var dx = b.x - a.x, dy = b.y - a.y
-        if square {
-            let side = max(abs(dx), abs(dy))
-            dx = dx < 0 ? -side : side
-            dy = dy < 0 ? -side : side
-        }
-        return NSRect(x: min(a.x, a.x + dx), y: min(a.y, a.y + dy), width: abs(dx), height: abs(dy))
-    }
-
-    /// Shift: lock lines to 45° steps.
-    private static func snap(_ p: NSPoint, from start: NSPoint) -> NSPoint {
-        let dx = p.x - start.x, dy = p.y - start.y
-        let length = hypot(dx, dy)
-        let angle = (atan2(dy, dx) / (.pi / 4)).rounded() * (.pi / 4)
-        return NSPoint(x: start.x + cos(angle) * length, y: start.y + sin(angle) * length)
-    }
-
-    // MARK: Keyboard
-
-    /// Tool keys, Delete, Esc, B (background) and zoom keys (- = 0).
-    override func keyDown(with event: NSEvent) {
-        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.numericPad, .function])
-        let key = event.charactersIgnoringModifiers?.lowercased() ?? ""
-        if modifiers.isEmpty, let tool = Tool.allCases.first(where: { $0.key == key }) {
-            self.tool = tool
-            return
-        }
-        // 1–6: stroke width, thin to thick.
-        if modifiers.isEmpty, let digit = Int(key), (1 ... 6).contains(digit) {
-            lineWidth = Self.widthSteps[digit - 1]
-            onStateChange?()
-            return
-        }
-        switch (event.keyCode, key) {
-        case (51, _), (117, _): // Delete
-            if let index = selected {
-                var list = annotations
-                list.remove(at: index)
-                selected = nil
-                commit(list)
-            } else {
-                undo()
-            }
-        case (53, _): // Esc
-            if editingCrop, crop != nil { crop = nil } else { selected = nil }
-        case (36, _), (76, _): // Return applies the crop
-            if editingCrop { tool = .select } else { super.keyDown(with: event) }
-        case (_, "b") where modifiers.isEmpty:
-            background.toggle()
-        case (_, "="), (_, "+"):
-            zoomLevel = min(4, zoom * 1.25)
-        case (_, "-"):
-            zoomLevel = max(0.1, zoom / 1.25)
-        case (_, "0"):
-            zoomLevel = nil
-        default:
-            super.keyDown(with: event)
-        }
-    }
-
-    // MARK: Text
-
-    private func beginText(at point: NSPoint) {
-        textOrigin = point
-        let sample = mark(.text(point, ""))
-        let font = NSFont.systemFont(ofSize: sample.textFont.pointSize * zoom, weight: .bold)
-        let field = NSTextField(frame: NSRect(origin: viewPoint(point),
-                                              size: NSSize(width: 260, height: font.boundingRectForFont.height)))
-        field.font = font
-        field.textColor = color
-        field.isBordered = false
-        field.drawsBackground = false
-        field.focusRingType = .none
-        field.placeholderString = "テキスト"
-        field.delegate = self
-        field.target = self
-        field.action = #selector(textCommitted)
-        addSubview(field)
-        window?.makeFirstResponder(field)
-        textField = field
-    }
-
-    @objc private func textCommitted() {
-        commitText()
-        window?.makeFirstResponder(self)
-    }
-
-    func controlTextDidEndEditing(_ obj: Notification) {
-        commitText()
-    }
-
-    private func commitText() {
-        guard let field = textField else { return }
-        textField = nil
-        let string = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        field.removeFromSuperview()
-        if !string.isEmpty {
-            commit(annotations + [mark(.text(textOrigin, string), by: .text)])
-        }
-    }
+    // MARK: Text (in CanvasView+Text.swift)
 }
