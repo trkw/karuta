@@ -29,7 +29,7 @@ extension AppDelegate {
         guard !isCapturing else { return }
         isCapturing = true
         let app = NSWorkspace.shared.frontmostApplication.flatMap { $0 == .current ? nil : $0.localizedName }
-        Task {
+        Task { [self] in
             defer { self.isCapturing = false }
             do {
                 let content = try await Capturer.shareableContent()
