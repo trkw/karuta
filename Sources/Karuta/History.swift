@@ -9,27 +9,9 @@ import KarutaCore
 enum CaptureHistory {
     static let didChange = Notification.Name("KarutaHistoryDidChange")
 
-    enum Kind: String, Codable, CaseIterable {
-        case area, window, fullscreen
-
-        var title: String {
-            switch self {
-            case .area: "範囲"
-            case .window: "ウィンドウ"
-            case .fullscreen: "全画面"
-            }
-        }
-    }
-
-    struct Item: Codable, Equatable {
-        let id: String
-        let date: Date
-        let kind: Kind
-        let width: Int
-        let height: Int
-        let scale: Double
-        let app: String?
-    }
+    /// The index's types live in KarutaCore so karuta-check can pin the stored JSON (K13).
+    typealias Kind = CaptureKind
+    typealias Item = HistoryItem
 
     private static let directory: URL = {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -124,5 +106,16 @@ enum CaptureHistory {
     private static func save() {
         if let data = try? JSONEncoder().encode(items) { try? data.write(to: indexURL, options: .atomic) }
         NotificationCenter.default.post(name: didChange, object: nil)
+    }
+}
+
+extension CaptureKind {
+    /// The name in the history window's filter.
+    var title: String {
+        switch self {
+        case .area: "範囲"
+        case .window: "ウィンドウ"
+        case .fullscreen: "全画面"
+        }
     }
 }
