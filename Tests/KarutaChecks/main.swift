@@ -366,5 +366,24 @@ equal("export: off keeps the shot", oneX(1600, 1200, scale: 2, on: false), "keep
 equal("export: a 1x shot is kept", oneX(1600, 1200, scale: 1), "keep")
 equal("export: a 1 pixel shot at 3x is kept (would be 0 wide)", oneX(1, 1, scale: 3), "keep")
 
+// The shapes the editor draws (K19), pinned from CanvasView+Mouse before moving them into KarutaCore.
+func shapeRect(_ a: CGPoint, _ b: CGPoint, square: Bool = false) -> String {
+    let r = DrawGeometry.rect(from: a, to: b, square: square)
+    return "\(r.minX),\(r.minY) \(r.width)x\(r.height)"
+}
+equal("shape: a drag down-right", shapeRect(CGPoint(x: 10, y: 20), CGPoint(x: 40, y: 60)), "10.0,20.0 30.0x40.0")
+equal("shape: any direction starts at the lower corner", shapeRect(CGPoint(x: 40, y: 60), CGPoint(x: 10, y: 20)), "10.0,20.0 30.0x40.0")
+equal("shape: Shift makes a square on the longer side", shapeRect(CGPoint(x: 10, y: 20), CGPoint(x: 40, y: 30), square: true), "10.0,20.0 30.0x30.0")
+equal("shape: a square keeps the drag's direction", shapeRect(CGPoint(x: 40, y: 60), CGPoint(x: 30, y: 20), square: true), "0.0,20.0 40.0x40.0")
+equal("shape: no drag is empty", shapeRect(CGPoint(x: 5, y: 5), CGPoint(x: 5, y: 5), square: true), "5.0,5.0 0.0x0.0")
+func snapped(_ p: CGPoint, from start: CGPoint = .zero) -> String {
+    let q = DrawGeometry.snap(p, from: start)
+    return String(format: "%.2f,%.2f", q.x, q.y)
+}
+equal("snap: nearly level becomes level, same length", snapped(CGPoint(x: 100, y: 10)), String(format: "%.2f,%.2f", hypot(Double(100), Double(10)), 0))
+equal("snap: near 45° becomes 45°", snapped(CGPoint(x: 100, y: 90)), String(format: "%.2f,%.2f", hypot(Double(100), Double(90)) / 2.0.squareRoot(), hypot(Double(100), Double(90)) / 2.0.squareRoot()))
+equal("snap: nearly upright becomes upright", snapped(CGPoint(x: -5, y: -100)), String(format: "%.2f,%.2f", 0.0, -hypot(Double(5), Double(100))))
+equal("snap: measured from the start", snapped(CGPoint(x: 110, y: 52), from: CGPoint(x: 10, y: 50)), String(format: "%.2f,%.2f", 10 + hypot(Double(100), Double(2)), 50.0))
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
