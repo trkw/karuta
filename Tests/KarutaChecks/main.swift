@@ -218,6 +218,15 @@ var stitchHalf = stitchScrolled
 for i in stride(from: 0, to: 90, by: 5) { stitchHalf[i] = 9999 }  // 18 of 90 differ: 80%
 equal("shift: 80% is not", "\(StitchRows.shift(stitchPage, stitchHalf, lo: 0, hi: 100).map(String.init) ?? "nil")", "nil")
 equal("shift: within lo..<hi only", "\(StitchRows.shift([0, 0] + stitchPage, [9, 9] + stitchScrolled, lo: 2, hi: 102).map(String.init) ?? "nil")", "10")
+func stitchContinuing(lo: Int, hi: Int) -> String {
+    StitchRows.continuingShift(stitchPage, stitchScrolled, lo: lo, hi: hi).map(String.init) ?? "nil"
+}
+equal("continuing: 23 moving rows are too few", stitchContinuing(lo: 0, hi: 23), "nil")
+equal("continuing: though shift alone finds one there", "\(StitchRows.shift(stitchPage, stitchScrolled, lo: 0, hi: 23) ?? -1)", "10")
+equal("continuing: 24 moving rows are enough", stitchContinuing(lo: 0, hi: 24), "10")
+equal("continuing: the span is hi - lo", stitchContinuing(lo: 10, hi: 33), "nil")
+equal("continuing: the minimum span", "\(StitchRows.minimumSpan)", "24")
+equal("continuing: no match is nil", StitchRows.continuingShift(stitchPage, stitchPage, lo: 0, hi: 100).map(String.init) ?? "nil", "nil")
 
 func stitchFrames(width: Int, height: Int, changing columns: [Int]) -> ([UInt32], [UInt32]) {
     let old = [UInt32](repeating: 1, count: width * height)

@@ -49,8 +49,7 @@ struct Stitcher {
         let h = rows.count
         let (top, bottom) = StitchRows.unmovedBands(oldRows, rows)
         let lo = top, hi = h - bottom
-        let span = hi - lo
-        guard span >= 24, let shift = StitchRows.shift(oldRows, rows, lo: lo, hi: hi) else {
+        guard let shift = StitchRows.continuingShift(oldRows, rows, lo: lo, hi: hi) else {
             // Scrolled back up, or the content changed: wait for a frame that continues the page.
             return false
         }
