@@ -307,5 +307,40 @@ equal("targets: indices past the shown items are dropped", historyTargets(1, sel
 equal("targets: a click past the end is nothing", historyTargets(5, selected: [], count: 5), "")
 equal("targets: nothing shown", historyTargets(0, selected: [0], count: 0), "")
 
+// The GIF made from a recording (K18), pinned from ScreenRecorder.makeGIF before using KarutaCore for it.
+// Its name: the old loop, written out here, and FileNaming.uniqueURL give the same file.
+func oldGIFName(_ movie: URL, existing: Set<String>) -> String {
+    let base = movie.deletingPathExtension()
+    var gif = base.appendingPathExtension("gif")
+    var n = 2
+    while existing.contains(gif.path) {
+        gif = base.deletingLastPathComponent().appendingPathComponent("\(base.lastPathComponent) (\(n)).gif")
+        n += 1
+    }
+    return gif.path
+}
+let gifMovie = URL(fileURLWithPath: "/tmp/Recordings/Karuta 2026-11-13 21.40.12.mov")
+for (label, existing) in [
+    ("none", Set<String>()),
+    ("the plain name", ["/tmp/Recordings/Karuta 2026-11-13 21.40.12.gif"]),
+    ("the plain name and (2)", ["/tmp/Recordings/Karuta 2026-11-13 21.40.12.gif", "/tmp/Recordings/Karuta 2026-11-13 21.40.12 (2).gif"]),
+    ("only (2)", ["/tmp/Recordings/Karuta 2026-11-13 21.40.12 (2).gif"]),
+] {
+    let base = gifMovie.deletingPathExtension()
+    let new = FileNaming.uniqueURL(in: base.deletingLastPathComponent(), base: base.lastPathComponent, extension: "gif") {
+        existing.contains($0.path)
+    }
+    equal("gif name: \(label) exists", new.path, oldGIFName(gifMovie, existing: existing))
+}
+// How many frames: 15 a second, at least 1, at most 120 seconds' worth.
+func gifFrames(_ duration: Double) -> String { "\(GIFFrames.count(duration: duration))" }
+equal("gif frames: 15 a second", gifFrames(1), "15")
+equal("gif frames: a part frame is dropped", gifFrames(2.5), "37")
+equal("gif frames: at least 1", gifFrames(0.05), "1")
+equal("gif frames: an empty movie still has 1", gifFrames(0), "1")
+equal("gif frames: 120 seconds", gifFrames(120), "1800")
+equal("gif frames: longer movies stop at 120 seconds", gifFrames(500), "1800")
+equal("gif frames: the rate", "\(GIFFrames.fps)", "15.0")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
