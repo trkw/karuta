@@ -385,5 +385,27 @@ equal("snap: near 45° becomes 45°", snapped(CGPoint(x: 100, y: 90)), String(fo
 equal("snap: nearly upright becomes upright", snapped(CGPoint(x: -5, y: -100)), String(format: "%.2f,%.2f", 0.0, -hypot(Double(5), Double(100))))
 equal("snap: measured from the start", snapped(CGPoint(x: 110, y: 52), from: CGPoint(x: 10, y: 50)), String(format: "%.2f,%.2f", 10 + hypot(Double(100), Double(2)), 50.0))
 
+// Coordinate conversions (K20), pinned from Geometry.appKitRect and Capturer.sourceRect before moving
+// them into KarutaCore. They feed the capture rect, so the math must not change.
+func rectText(_ r: CGRect) -> String { "\(r.minX),\(r.minY) \(r.width)x\(r.height)" }
+equal("coords: CG top-left to AppKit bottom-left",
+      rectText(ScreenGeometry.appKitRect(fromCG: CGRect(x: 100, y: 50, width: 200, height: 100), primaryHeight: 1080)),
+      "100.0,930.0 200.0x100.0")
+equal("coords: a window on a screen above the main one",
+      rectText(ScreenGeometry.appKitRect(fromCG: CGRect(x: 0, y: -500, width: 100, height: 100), primaryHeight: 1080)),
+      "0.0,1480.0 100.0x100.0")
+equal("coords: no screens means a height of 0",
+      rectText(ScreenGeometry.appKitRect(fromCG: CGRect(x: 10, y: 20, width: 30, height: 40), primaryHeight: 0)),
+      "10.0,-60.0 30.0x40.0")
+equal("coords: source rect on the main screen",
+      rectText(ScreenGeometry.sourceRect(CGRect(x: 100, y: 200, width: 300, height: 100), screenFrame: CGRect(x: 0, y: 0, width: 1440, height: 900))),
+      "100.0,600.0 300.0x100.0")
+equal("coords: source rect on a screen to the right and lower",
+      rectText(ScreenGeometry.sourceRect(CGRect(x: 1500, y: 0, width: 100, height: 100), screenFrame: CGRect(x: 1440, y: -200, width: 1920, height: 1080))),
+      "60.0,780.0 100.0x100.0")
+equal("coords: the whole screen is the source rect from 0",
+      rectText(ScreenGeometry.sourceRect(CGRect(x: 1440, y: -200, width: 1920, height: 1080), screenFrame: CGRect(x: 1440, y: -200, width: 1920, height: 1080))),
+      "0.0,0.0 1920.0x1080.0")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
