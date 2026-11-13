@@ -342,5 +342,13 @@ equal("gif frames: 120 seconds", gifFrames(120), "1800")
 equal("gif frames: longer movies stop at 120 seconds", gifFrames(500), "1800")
 equal("gif frames: the rate", "\(GIFFrames.fps)", "15.0")
 
+// The image formats (K5, part 1), pinned from Preferences.ImageFormat before moving it into KarutaCore.
+// The raw values are what Settings stores, so they must not change.
+equal("format: the raw values (stored in Settings)", ImageFormat.allCases.map(\.rawValue).joined(separator: ","), "png,jpeg,heic")
+equal("format: menu order and titles", ImageFormat.allCases.map(\.title).joined(separator: ","), "PNG,JPEG,HEIC")
+equal("format: file extensions", ImageFormat.allCases.map(\.fileExtension).joined(separator: ","), "png,jpg,heic")
+equal("format: types", ImageFormat.allCases.map(\.utType.identifier).joined(separator: ","), "public.png,public.jpeg,public.heic")
+equal("format: an unknown stored value is no format", "\(ImageFormat(rawValue: "jpg") == nil)", "true")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
