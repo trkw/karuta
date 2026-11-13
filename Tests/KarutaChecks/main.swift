@@ -202,5 +202,48 @@ equal("filter: a kind with nothing", HistoryRules.items(byKind, ofKind: .fullscr
 equal("segment 0 is every kind", "\(String(describing: HistoryRules.kind(forSegment: 0)))", "nil")
 equal("segments 1… follow the kinds", "\((1...3).map { HistoryRules.kind(forSegment: $0)?.rawValue ?? "nil" })", "[\"area\", \"window\", \"fullscreen\"]")
 
+// MARK: Scrolling capture (K15): finding how far the stitchPage moved between two frames.
+
+let stitchPage: [UInt64] = (0..<100).map { UInt64($0 + 1000) }
+let stitchScrolled = Array(stitchPage[10...]) + (0..<10).map { UInt64($0 + 5000) }
+equal("shift: a page scrolled by 10 rows", "\(StitchRows.shift(stitchPage, stitchScrolled, lo: 0, hi: 100).map(String.init) ?? "nil")", "10")
+equal("shift: an unmoved, varied page is no shift", "\(StitchRows.shift(stitchPage, stitchPage, lo: 0, hi: 100).map(String.init) ?? "nil")", "nil")
+let stitchPlain = [UInt64](repeating: 7, count: 100)
+equal("shift: identical rows take the smallest shift", "\(StitchRows.shift(stitchPlain, stitchPlain, lo: 0, hi: 100).map(String.init) ?? "nil")", "1")
+equal("shift: a span no wider than the minimum overlap", "\(StitchRows.shift(stitchPage, stitchScrolled, lo: 0, hi: 12).map(String.init) ?? "nil")", "nil")
+var stitchMostly = stitchScrolled
+for i in stride(from: 0, to: 90, by: 12) { stitchMostly[i] = 9999 }  // 8 of 90 rows differ: 91% match
+equal("shift: 91% of the overlap is enough", "\(StitchRows.shift(stitchPage, stitchMostly, lo: 0, hi: 100).map(String.init) ?? "nil")", "10")
+var stitchHalf = stitchScrolled
+for i in stride(from: 0, to: 90, by: 5) { stitchHalf[i] = 9999 }  // 18 of 90 differ: 80%
+equal("shift: 80% is not", "\(StitchRows.shift(stitchPage, stitchHalf, lo: 0, hi: 100).map(String.init) ?? "nil")", "nil")
+equal("shift: within lo..<hi only", "\(StitchRows.shift([0, 0] + stitchPage, [9, 9] + stitchScrolled, lo: 2, hi: 102).map(String.init) ?? "nil")", "10")
+
+func stitchFrames(width: Int, height: Int, changing columns: [Int]) -> ([UInt32], [UInt32]) {
+    let old = [UInt32](repeating: 1, count: width * height)
+    var new = old
+    for y in 0..<height { for x in columns { new[y * width + x] = 2 } }
+    return (old, new)
+}
+func stitchMoving(_ width: Int, _ columns: [Int]) -> String {
+    let (old, new) = stitchFrames(width: width, height: 3, changing: columns)
+    return StitchRows.movingColumns(old, new, width: width, height: 3).map { "\($0.lowerBound)..<\($0.upperBound)" } ?? "nil"
+}
+equal("columns: nothing moved", stitchMoving(100, []), "nil")
+equal("columns: from the first to the last change", stitchMoving(100, [5, 10]), "5..<11")
+equal("columns: only the scroll bar changed", stitchMoving(100, [80, 99]), "nil")
+equal("columns: the scroll bar is left out", stitchMoving(100, [50, 90]), "50..<76")
+equal("columns: a narrow area is matched whole", stitchMoving(20, [19]), "19..<20")
+equal("scroll bar width", "\(StitchRows.scrollBarWidth)", "24")
+
+let stitchRow: [UInt32] = [0x0011_2233, 0x0044_5566, 0x0077_8899, 0x00aa_bbcc]
+func stitchHash(_ row: [UInt32], _ columns: Range<Int> = 0..<4) -> UInt64 { StitchRows.rowHashes(row, width: 4, columns: columns)[0] }
+check("hashes: the same row, the same hash", stitchHash(stitchRow) == stitchHash(stitchRow))
+check("hashes: the alpha byte is ignored", stitchHash(stitchRow) == stitchHash(stitchRow.map { $0 | 0xff00_0000 }))
+check("hashes: every other pixel (an odd column is skipped)", stitchHash(stitchRow) == stitchHash([stitchRow[0], 0, stitchRow[2], 0]))
+check("hashes: an even column counts", stitchHash(stitchRow) != stitchHash([0, stitchRow[1], stitchRow[2], stitchRow[3]]))
+check("hashes: columns outside the range are ignored", stitchHash(stitchRow, 2..<4) == stitchHash([9, 9, stitchRow[2], stitchRow[3]], 2..<4))
+equal("hashes: one per row", "\(StitchRows.rowHashes(stitchRow + stitchRow, width: 4, columns: 0..<4).count)", "2")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)

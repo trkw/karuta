@@ -1,4 +1,5 @@
 import AppKit
+import KarutaCore
 
 // MARK: - Stitching
 
@@ -17,8 +18,6 @@ struct Stitcher {
 
     /// A tall page is cut off here (pixels), to keep the image manageable.
     static let maxHeight = 32000
-    /// Pixels at the right edge never matched: the scroll bar fades in and moves while scrolling.
-    static let scrollBarWidth = 24
 
     private var previous: Frame?
     /// Kept rows, top to bottom; the last frame's bottom band (a sticky footer) goes after them.
@@ -41,10 +40,10 @@ struct Stitcher {
             return true
         }
         guard image.width == previous.image.width, image.height == previous.image.height,
-              let columns = Self.movingColumns(previous.pixels, pixels, width: image.width, height: image.height)
+              let columns = StitchRows.movingColumns(previous.pixels, pixels, width: image.width, height: image.height)
         else { return false }
-        let oldRows = Self.rowHashes(previous.pixels, width: image.width, columns: columns)
-        let rows = Self.rowHashes(pixels, width: image.width, columns: columns)
+        let oldRows = StitchRows.rowHashes(previous.pixels, width: image.width, columns: columns)
+        let rows = StitchRows.rowHashes(pixels, width: image.width, columns: columns)
 
         // Bands that didn't move at all: sticky headers at the top, toolbars or footers at the bottom.
         let h = rows.count
@@ -54,7 +53,7 @@ struct Stitcher {
         while bottom < h - top, rows[h - 1 - bottom] == oldRows[h - 1 - bottom] { bottom += 1 }
         let lo = top, hi = h - bottom
         let span = hi - lo
-        guard span >= 24, let shift = Self.shift(oldRows, rows, lo: lo, hi: hi) else {
+        guard span >= 24, let shift = StitchRows.shift(oldRows, rows, lo: lo, hi: hi) else {
             // Scrolled back up, or the content changed: wait for a frame that continues the page.
             return false
         }
@@ -78,24 +77,6 @@ struct Stitcher {
         return hi > start
     }
 
-    /// The scroll distance in rows: the smallest shift `s` where the new frame's rows from `lo` match the
-    /// previous frame's from `lo + s` best (at least 90% of the overlap, which must be a sixth of the span).
-    private static func shift(_ old: [UInt64], _ new: [UInt64], lo: Int, hi: Int) -> Int? {
-        let span = hi - lo
-        let minOverlap = max(12, span / 6)
-        guard span - minOverlap >= 1 else { return nil }
-        var best: (shift: Int, score: Double)?
-        for s in 1 ... (span - minOverlap) {
-            let overlap = span - s
-            var matches = 0
-            for i in 0 ..< overlap where new[lo + i] == old[lo + s + i] { matches += 1 }
-            let score = Double(matches) / Double(overlap)
-            if score > (best?.score ?? 0.9) { best = (s, score) }
-            if score == 1 { break } // can't do better; keep the smallest such shift
-        }
-        return best?.shift
-    }
-
     /// The image as 32-bit pixels, top row first.
     private static func pixels(_ image: CGImage) -> [UInt32]? {
         let width = image.width, height = image.height
@@ -112,45 +93,6 @@ struct Stitcher {
         return drawn ? pixels : nil
     }
 
-    /// The columns to match: from the first to the last column that changed between the two frames,
-    /// leaving out unchanged ones at either side and the scroll bar at the right edge. Nil when nothing moved.
-    private static func movingColumns(_ old: [UInt32], _ new: [UInt32], width: Int, height: Int) -> Range<Int>? {
-        var changed = [Bool](repeating: false, count: width)
-        old.withUnsafeBufferPointer { a in
-            new.withUnsafeBufferPointer { b in
-                for y in 0 ..< height {
-                    let row = y * width
-                    for x in 0 ..< width where !changed[x] && a[row + x] != b[row + x] { changed[x] = true }
-                }
-            }
-        }
-        guard let first = changed.firstIndex(of: true), let last = changed.lastIndex(of: true) else { return nil }
-        // A narrow area is matched whole; otherwise a change in the scroll bar alone isn't a scroll.
-        guard width >= scrollBarWidth * 4 else { return first ..< last + 1 }
-        let end = min(last + 1, width - scrollBarWidth)
-        return first < end ? first ..< end : nil
-    }
-
-    /// One hash per pixel row, over `columns` (every other pixel).
-    private static func rowHashes(_ pixels: [UInt32], width: Int, columns: Range<Int>) -> [UInt64] {
-        let height = pixels.count / max(width, 1)
-        var hashes = [UInt64](repeating: 0, count: height)
-        pixels.withUnsafeBufferPointer { p in
-            for y in 0 ..< height {
-                var hash: UInt64 = 0xcbf2_9ce4_8422_2325
-                var i = y * width + columns.lowerBound
-                let end = y * width + columns.upperBound
-                while i < end {
-                    hash = (hash ^ UInt64(p[i] & 0x00ff_ffff)) &* 0x0000_0100_0000_01b3
-                    i += 2
-                }
-                hashes[y] = hash
-            }
-        }
-        return hashes
-    }
-
-    /// Rows `from ..< to` (top-origin) copied into their own bitmap, so the frame can be released.
     private static func copyRows(_ image: CGImage, _ from: Int, _ to: Int) -> CGImage? {
         guard to > from, let cropped = image.cropping(to: CGRect(x: 0, y: from, width: image.width, height: to - from)),
               let context = AnnotationRenderer.bitmap(width: cropped.width, height: cropped.height, space: image.colorSpace)
