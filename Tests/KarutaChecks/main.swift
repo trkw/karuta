@@ -259,5 +259,16 @@ equal("bands: the top band is counted first when all rows are equal", stitchBand
 equal("bands: a middle equal row is not a band", stitchBands([1, 7, 3], [4, 7, 6]), "0,0")
 equal("bands: no rows", stitchBands([], []), "0,0")
 
+func stitchNext(keptEnd: Int, lo: Int, hi: Int, shift: Int, hasKept: Bool = true) -> String {
+    let next = StitchRows.continuation(keptEnd: keptEnd, lo: lo, hi: hi, shift: shift, hasKept: hasKept)
+    return "\(next.trim),\(next.start)"
+}
+equal("next: rows past the overlap are added", stitchNext(keptEnd: 100, lo: 0, hi: 100, shift: 30), "0,70")
+equal("next: never above the sticky header", stitchNext(keptEnd: 100, lo: 20, hi: 100, shift: 90), "0,20")
+equal("next: kept rows past a new footer come off", stitchNext(keptEnd: 100, lo: 0, hi: 90, shift: 30), "10,60")
+equal("next: nothing comes off when nothing is kept", stitchNext(keptEnd: 100, lo: 0, hi: 90, shift: 30, hasKept: false), "0,70")
+equal("next: kept end before the bottom band", stitchNext(keptEnd: 80, lo: 0, hi: 90, shift: 30), "0,50")
+equal("next: a start at or past hi adds nothing", stitchNext(keptEnd: 100, lo: 0, hi: 100, shift: 0), "0,100")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
