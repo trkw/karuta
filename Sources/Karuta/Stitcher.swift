@@ -55,9 +55,10 @@ struct Stitcher {
             return false
         }
 
+        let next = StitchRows.continuation(keptEnd: keptEnd, lo: lo, hi: hi, shift: shift, hasKept: !segments.isEmpty)
         // Rows kept as page content that turn out to be a fixed footer come off the end.
-        if keptEnd > hi, let last = segments.last {
-            let extra = min(keptEnd - hi, last.height)
+        if next.trim > 0, let last = segments.last {
+            let extra = min(next.trim, last.height)
             if extra == last.height {
                 segments.removeLast()
             } else if let trimmed = Self.copyRows(last, 0, last.height - extra) {
@@ -65,8 +66,7 @@ struct Stitcher {
             }
             keptEnd = hi
         }
-        // The previous frame's row r is this frame's row r - shift.
-        let start = max(lo, keptEnd - shift)
+        let start = next.start
         if hi > start, let added = Self.copyRows(image, start, hi) { segments.append(added) }
         footer = bottom > 0 ? Self.copyRows(image, hi, h) : nil
         keptEnd = hi

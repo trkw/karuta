@@ -75,4 +75,17 @@ public enum StitchRows {
         while bottom < h - top, rows[h - 1 - bottom] == oldRows[h - 1 - bottom] { bottom += 1 }
         return (top, bottom)
     }
+
+    /// Where a continuing frame's rows go. Rows kept from earlier frames past `hi` turn out to be a fixed
+    /// footer, and `trim` of them come off the end when anything is kept; the new frame's rows from `start`
+    /// to `hi` are added (none when `start` is at or past `hi`).
+    public static func continuation(keptEnd: Int, lo: Int, hi: Int, shift: Int, hasKept: Bool) -> (trim: Int, start: Int) {
+        var kept = keptEnd, trim = 0
+        if kept > hi, hasKept {
+            trim = kept - hi
+            kept = hi
+        }
+        // The previous frame's row r is this frame's row r - shift.
+        return (trim, max(lo, kept - shift))
+    }
 }
