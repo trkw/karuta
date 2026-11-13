@@ -407,5 +407,17 @@ equal("coords: the whole screen is the source rect from 0",
       rectText(ScreenGeometry.sourceRect(CGRect(x: 1440, y: -200, width: 1920, height: 1080), screenFrame: CGRect(x: 1440, y: -200, width: 1920, height: 1080))),
       "0.0,0.0 1920.0x1080.0")
 
+// Where a Quick Access card sits (K21), pinned from QuickOverlay.x(for:hidden:) before moving it into KarutaCore.
+let cardScreen = CGRect(x: 0, y: 0, width: 1440, height: 900)
+func cardX(onRight: Bool, hidden: Bool, gap: CGFloat = 20, screen: CGRect = cardScreen) -> String {
+    "\(CardLayout.x(screenFrame: screen, cardWidth: 300, onRight: onRight, hidden: hidden, margin: 16, gap: gap))"
+}
+equal("card: left, shown, inside the margin", cardX(onRight: false, hidden: false), "16.0")
+equal("card: left, hidden, past the edge and the gap", cardX(onRight: false, hidden: true), "-320.0")
+equal("card: right, shown, inside the margin", cardX(onRight: true, hidden: false), "1124.0")
+equal("card: right, hidden, past the edge and the gap", cardX(onRight: true, hidden: true), "1460.0")
+equal("card: hidden with no gap (where it slides in from)", cardX(onRight: false, hidden: true, gap: 0), "-300.0")
+equal("card: on a second screen to the right", cardX(onRight: true, hidden: false, screen: CGRect(x: 1440, y: 0, width: 1920, height: 1080)), "3044.0")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
