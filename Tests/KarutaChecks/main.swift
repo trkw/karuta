@@ -279,5 +279,20 @@ equal("next: nothing comes off when nothing is kept", stitchNext(keptEnd: 100, l
 equal("next: kept end before the bottom band", stitchNext(keptEnd: 80, lo: 0, hi: 90, shift: 30), "0,50")
 equal("next: a start at or past hi adds nothing", stitchNext(keptEnd: 100, lo: 0, hi: 100, shift: 0), "0,100")
 
+// The recording's pixel size (K16), pinned from ScreenRecorder.outputSize before moving it into KarutaCore.
+func recordingSize(_ width: CGFloat, _ height: CGFloat, scale: CGFloat) -> String {
+    let size = RecordingSize.output(points: CGSize(width: width, height: height), scale: scale)
+    return "\(size.width)x\(size.height)"
+}
+equal("recording: points times the scale", recordingSize(800, 600, scale: 2), "1600x1200")
+equal("recording: odd sides round down to even", recordingSize(801, 601, scale: 1), "800x600")
+equal("recording: a 5K screen fits 4096 x 2304", recordingSize(2560, 1440, scale: 2), "4096x2304")
+equal("recording: a tall area fits the height, keeping the shape", recordingSize(1000, 3000, scale: 1), "768x2304")
+equal("recording: a wide area fits the width", recordingSize(6000, 100, scale: 1), "4096x68")
+equal("recording: fractions are dropped", recordingSize(100.7, 50.3, scale: 1), "100x50")
+equal("recording: a 1.5 scale", recordingSize(333, 333, scale: 1.5), "498x498")
+equal("recording: at least 2 x 2", recordingSize(1, 1, scale: 1), "2x2")
+equal("recording: an empty area is 2 x 2", recordingSize(0, 0, scale: 2), "2x2")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
