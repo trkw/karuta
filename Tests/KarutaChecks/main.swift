@@ -160,5 +160,34 @@ equal("in between goes in its place", "\(HistoryRules.insertionIndex(for: histor
 equal("older than all goes last", "\(HistoryRules.insertionIndex(for: historyNow - 99, in: listed))", "3")
 equal("the same time goes after the existing one", "\(HistoryRules.insertionIndex(for: historyNow - 10, in: listed))", "2")
 
+// MARK: History index (K13): the JSON on users' Macs (Application Support/Karuta/History/index.json).
+
+let storedIndex = #"""
+[{"id":"A1","date":800000000.5,"kind":"area","width":640,"height":480,"scale":2,"app":"Safari"},
+ {"id":"B2","date":799999000,"kind":"fullscreen","width":1,"height":1,"scale":1}]
+"""#
+let decodedIndex = try? JSONDecoder().decode([HistoryItem].self, from: Data(storedIndex.utf8))
+check("index: the stored form reads", decodedIndex?.count == 2)
+if let first = decodedIndex?.first, let second = decodedIndex?.last {
+    check("index: date is seconds since 2001", first.date == Date(timeIntervalSinceReferenceDate: 800_000_000.5))
+    check("index: fields", first.id == "A1" && first.kind == .area && first.width == 640 && first.height == 480)
+    check("index: a whole-number scale reads as Double", first.scale == 2.0)
+    check("index: app may be missing", second.app == nil && second.kind == .fullscreen)
+}
+equal("index: kind names", CaptureKind.allCases.map(\.rawValue).joined(separator: ","), "area,window,fullscreen")
+// One entry with a kind Karuta does not know makes the whole index unreadable (today: history starts empty).
+let unknownKind = #"[{"id":"C3","date":1,"kind":"scroll","width":1,"height":1,"scale":1}]"#
+check("index: an unknown kind fails the whole index", (try? JSONDecoder().decode([HistoryItem].self, from: Data(unknownKind.utf8))) == nil)
+// Written back with the same keys, and read back equal.
+let item = HistoryItem(id: "D4", date: Date(timeIntervalSinceReferenceDate: 1234.5), kind: .window, width: 3, height: 4, scale: 2, app: nil)
+if let data = try? JSONEncoder().encode([item]),
+   let object = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+    equal("index: keys written", (object.first?.keys.sorted() ?? []).joined(separator: ","), "date,height,id,kind,scale,width")
+    equal("index: date written as seconds since 2001", "\(object.first?["date"] ?? "")", "1234.5")
+    check("index: round trip", (try? JSONDecoder().decode([HistoryItem].self, from: data)) == [item])
+} else {
+    check("index: encodes", false)
+}
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
