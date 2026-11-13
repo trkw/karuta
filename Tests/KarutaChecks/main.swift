@@ -294,5 +294,18 @@ equal("recording: a 1.5 scale", recordingSize(333, 333, scale: 1.5), "498x498")
 equal("recording: at least 2 x 2", recordingSize(1, 1, scale: 1), "2x2")
 equal("recording: an empty area is 2 x 2", recordingSize(0, 0, scale: 2), "2x2")
 
+// What a right click in the history window acts on (K17), pinned from HistoryWindow.items(around:)
+// before moving it into HistoryRules.
+func historyTargets(_ index: Int, selected: [Int], count: Int) -> String {
+    HistoryRules.targets(around: index, selected: selected, count: count).map(String.init).joined(separator: ",")
+}
+equal("targets: no selection is the clicked item", historyTargets(2, selected: [], count: 5), "2")
+equal("targets: inside the selection is the whole selection", historyTargets(1, selected: [3, 1], count: 5), "1,3")
+equal("targets: outside the selection is the clicked item only", historyTargets(4, selected: [1, 3], count: 5), "4")
+equal("targets: the selection is sorted", historyTargets(0, selected: [4, 0, 2], count: 5), "0,2,4")
+equal("targets: indices past the shown items are dropped", historyTargets(1, selected: [1, 7], count: 5), "1")
+equal("targets: a click past the end is nothing", historyTargets(5, selected: [], count: 5), "")
+equal("targets: nothing shown", historyTargets(0, selected: [0], count: 0), "")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
