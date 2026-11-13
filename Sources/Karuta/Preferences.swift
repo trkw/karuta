@@ -7,27 +7,8 @@ import UniformTypeIdentifiers
 enum Preferences {
     static let didChange = Notification.Name("KarutaPreferencesDidChange")
 
-    enum ImageFormat: String, CaseIterable {
-        case png, jpeg, heic
-
-        var fileExtension: String {
-            switch self {
-            case .png: "png"
-            case .jpeg: "jpg"
-            case .heic: "heic"
-            }
-        }
-
-        var utType: UTType {
-            switch self {
-            case .png: .png
-            case .jpeg: .jpeg
-            case .heic: .heic
-            }
-        }
-
-        var title: String { rawValue.uppercased() }
-    }
+    /// The image formats now live in KarutaCore (K5); the name stays so callers are unchanged.
+    typealias ImageFormat = KarutaCore.ImageFormat
 
     private static let defaults = UserDefaults.standard
     private typealias Key = PreferenceKey
