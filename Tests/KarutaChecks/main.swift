@@ -245,5 +245,19 @@ check("hashes: an even column counts", stitchHash(stitchRow) != stitchHash([0, s
 check("hashes: columns outside the range are ignored", stitchHash(stitchRow, 2..<4) == stitchHash([9, 9, stitchRow[2], stitchRow[3]], 2..<4))
 equal("hashes: one per row", "\(StitchRows.rowHashes(stitchRow + stitchRow, width: 4, columns: 0..<4).count)", "2")
 
+// MARK: Scrolling capture (K15): the bands that did not move (sticky headers, toolbars, footers).
+
+func stitchBands(_ old: [UInt64], _ new: [UInt64]) -> String {
+    let bands = StitchRows.unmovedBands(old, new)
+    return "\(bands.top),\(bands.bottom)"
+}
+equal("bands: nothing still", stitchBands([1, 2, 3, 4], [5, 6, 7, 8]), "0,0")
+equal("bands: a sticky header", stitchBands([9, 2, 3, 4], [9, 6, 7, 8]), "1,0")
+equal("bands: a fixed footer", stitchBands([1, 2, 3, 9], [5, 6, 7, 9]), "0,1")
+equal("bands: both", stitchBands([9, 9, 3, 4, 8], [9, 9, 5, 6, 8]), "2,1")
+equal("bands: the top band is counted first when all rows are equal", stitchBands([1, 2, 3], [1, 2, 3]), "3,0")
+equal("bands: a middle equal row is not a band", stitchBands([1, 7, 3], [4, 7, 6]), "0,0")
+equal("bands: no rows", stitchBands([], []), "0,0")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
