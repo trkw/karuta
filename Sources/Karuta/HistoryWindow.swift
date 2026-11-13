@@ -1,4 +1,5 @@
 import AppKit
+import KarutaCore
 
 // MARK: - Window
 
@@ -100,14 +101,14 @@ final class HistoryWindowController: NSWindowController, NSCollectionViewDataSou
 
     private func reload() {
         CaptureHistory.prune()
-        shown = CaptureHistory.items.filter { kind == nil || $0.kind == kind }
+        shown = HistoryRules.items(CaptureHistory.items, ofKind: kind)
         collection.reloadData()
         empty.isHidden = !shown.isEmpty
     }
 
     @objc private func filterChanged() {
         let index = filter.selectedSegment
-        kind = index == 0 ? nil : CaptureHistory.Kind.allCases[index - 1]
+        kind = HistoryRules.kind(forSegment: index)
         reload()
     }
 

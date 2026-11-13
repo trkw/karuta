@@ -13,4 +13,14 @@ public enum HistoryRules {
     public static func insertionIndex(for date: Date, in dates: [Date]) -> Int {
         dates.firstIndex { $0 < date } ?? dates.count
     }
+
+    /// The captures the history window shows for a kind (nil: all of them), in the given order.
+    public static func items(_ items: [HistoryItem], ofKind kind: CaptureKind?) -> [HistoryItem] {
+        items.filter { kind == nil || $0.kind == kind }
+    }
+
+    /// The kind for the history window's filter segment: 0 is every kind, then the kinds in order.
+    public static func kind(forSegment index: Int) -> CaptureKind? {
+        index == 0 ? nil : CaptureKind.allCases[index - 1]
+    }
 }

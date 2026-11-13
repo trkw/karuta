@@ -189,5 +189,18 @@ if let data = try? JSONEncoder().encode([item]),
     check("index: encodes", false)
 }
 
+// MARK: History filter (K13): the history window's segments and what they show.
+
+let byKind = [
+    HistoryItem(id: "1", date: historyNow, kind: .area, width: 1, height: 1, scale: 1, app: nil),
+    HistoryItem(id: "2", date: historyNow, kind: .window, width: 1, height: 1, scale: 1, app: nil),
+    HistoryItem(id: "3", date: historyNow, kind: .area, width: 1, height: 1, scale: 1, app: nil),
+]
+equal("filter: all kinds", HistoryRules.items(byKind, ofKind: nil).map(\.id).joined(), "123")
+equal("filter: one kind, in order", HistoryRules.items(byKind, ofKind: .area).map(\.id).joined(), "13")
+equal("filter: a kind with nothing", HistoryRules.items(byKind, ofKind: .fullscreen).map(\.id).joined(), "")
+equal("segment 0 is every kind", "\(String(describing: HistoryRules.kind(forSegment: 0)))", "nil")
+equal("segments 1… follow the kinds", "\((1...3).map { HistoryRules.kind(forSegment: $0)?.rawValue ?? "nil" })", "[\"area\", \"window\", \"fullscreen\"]")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
