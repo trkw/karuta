@@ -350,5 +350,21 @@ equal("format: file extensions", ImageFormat.allCases.map(\.fileExtension).joine
 equal("format: types", ImageFormat.allCases.map(\.utType.identifier).joined(separator: ","), "public.png,public.jpeg,public.heic")
 equal("format: an unknown stored value is no format", "\(ImageFormat(rawValue: "jpg") == nil)", "true")
 
+// The numbers used when a capture is written (K5, part 2), pinned from Exporter before moving them into
+// KarutaCore. The image work itself stays in the app.
+equal("export: 72 dpi at 1x", "\(ExportSettings.dpi(scale: 1))", "72.0")
+equal("export: 144 dpi on Retina", "\(ExportSettings.dpi(scale: 2))", "144.0")
+equal("export: lossy quality", "\(ExportSettings.lossyQuality)", "0.9")
+equal("export: quality only for lossy formats", ImageFormat.allCases.map { "\(ExportSettings.usesQuality($0.utType))" }.joined(separator: ","), "false,true,true")
+func oneX(_ width: Int, _ height: Int, scale: CGFloat, on: Bool = true) -> String {
+    ExportSettings.oneXSize(width: width, height: height, scale: scale, scaleRetina: on).map { "\($0.width)x\($0.height)" } ?? "keep"
+}
+equal("export: Retina to 1x halves the pixels", oneX(1600, 1200, scale: 2), "800x600")
+equal("export: odd pixels round to nearest", oneX(1601, 1199, scale: 2), "801x600")
+equal("export: a 1.5 scale", oneX(300, 301, scale: 1.5), "200x201")
+equal("export: off keeps the shot", oneX(1600, 1200, scale: 2, on: false), "keep")
+equal("export: a 1x shot is kept", oneX(1600, 1200, scale: 1), "keep")
+equal("export: a 1 pixel shot at 3x is kept (would be 0 wide)", oneX(1, 1, scale: 3), "keep")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
