@@ -1,4 +1,5 @@
 import AppKit
+import KarutaCore
 
 // The mouse: drawing, selecting, moving and cropping with drags.
 extension CanvasView {
@@ -103,20 +104,11 @@ extension CanvasView {
     static let widthSteps: [CGFloat] = [1, 2, 4, 6, 8, 12]
 
     private static func rect(from a: NSPoint, to b: NSPoint, square: Bool) -> NSRect {
-        var dx = b.x - a.x, dy = b.y - a.y
-        if square {
-            let side = max(abs(dx), abs(dy))
-            dx = dx < 0 ? -side : side
-            dy = dy < 0 ? -side : side
-        }
-        return NSRect(x: min(a.x, a.x + dx), y: min(a.y, a.y + dy), width: abs(dx), height: abs(dy))
+        DrawGeometry.rect(from: a, to: b, square: square)
     }
 
     /// Shift: lock lines to 45° steps.
     private static func snap(_ p: NSPoint, from start: NSPoint) -> NSPoint {
-        let dx = p.x - start.x, dy = p.y - start.y
-        let length = hypot(dx, dy)
-        let angle = (atan2(dy, dx) / (.pi / 4)).rounded() * (.pi / 4)
-        return NSPoint(x: start.x + cos(angle) * length, y: start.y + sin(angle) * length)
+        DrawGeometry.snap(p, from: start)
     }
 }
