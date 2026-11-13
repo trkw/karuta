@@ -63,4 +63,16 @@ public enum StitchRows {
     }
 
     /// Rows `from ..< to` (top-origin) copied into their own bitmap, so the frame can be released.
+
+    /// The rows at the top and at the bottom that are the same in both frames (sticky headers, toolbars,
+    /// footers). The top band is counted first, so equal frames are all top band.
+    public static func unmovedBands(_ old: [UInt64], _ new: [UInt64]) -> (top: Int, bottom: Int) {
+        let rows = new, oldRows = old
+        let h = rows.count
+        var top = 0
+        while top < h, rows[top] == oldRows[top] { top += 1 }
+        var bottom = 0
+        while bottom < h - top, rows[h - 1 - bottom] == oldRows[h - 1 - bottom] { bottom += 1 }
+        return (top, bottom)
+    }
 }

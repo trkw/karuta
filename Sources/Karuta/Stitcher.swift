@@ -47,10 +47,7 @@ struct Stitcher {
 
         // Bands that didn't move at all: sticky headers at the top, toolbars or footers at the bottom.
         let h = rows.count
-        var top = 0
-        while top < h, rows[top] == oldRows[top] { top += 1 }
-        var bottom = 0
-        while bottom < h - top, rows[h - 1 - bottom] == oldRows[h - 1 - bottom] { bottom += 1 }
+        let (top, bottom) = StitchRows.unmovedBands(oldRows, rows)
         let lo = top, hi = h - bottom
         let span = hi - lo
         guard span >= 24, let shift = StitchRows.shift(oldRows, rows, lo: lo, hi: hi) else {
