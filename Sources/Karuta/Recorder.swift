@@ -1,6 +1,7 @@
 import AppKit
 import AVFoundation
 import ImageIO
+import KarutaCore
 import ScreenCaptureKit
 import UniformTypeIdentifiers
 
@@ -140,8 +141,8 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
     static func makeGIF(from movie: URL) async throws -> URL {
         let asset = AVURLAsset(url: movie)
         let duration = try await asset.load(.duration).seconds
-        let fps = 15.0
-        let count = max(1, min(Int(duration * fps), Int(120 * fps)))
+        let fps = GIFFrames.fps
+        let count = GIFFrames.count(duration: duration)
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
         generator.maximumSize = CGSize(width: 960, height: 4000)
@@ -151,13 +152,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
 
         // Never replace an earlier GIF: a Quick Access card or the clipboard may still point at it.
         let base = movie.deletingPathExtension()
-        var gif = base.appendingPathExtension("gif")
-        var n = 2
-        while FileManager.default.fileExists(atPath: gif.path) {
-            gif = base.deletingLastPathComponent()
-                .appendingPathComponent("\(base.lastPathComponent) (\(n)).gif")
-            n += 1
-        }
+        let gif = FileNaming.uniqueURL(in: base.deletingLastPathComponent(), base: base.lastPathComponent, extension: "gif")
         guard let destination = CGImageDestinationCreateWithURL(gif as CFURL, UTType.gif.identifier as CFString, count, nil)
         else { throw CocoaError(.fileWriteUnknown) }
         let loop = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]]
