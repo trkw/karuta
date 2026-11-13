@@ -128,9 +128,8 @@ final class HistoryWindowController: NSWindowController, NSCollectionViewDataSou
 
     private func items(around index: Int) -> [CaptureHistory.Item] {
         // A right click on a selected item acts on the whole selection; otherwise on that item.
-        let selected = collection.selectionIndexPaths.map(\.item).sorted()
-        let indices = selected.contains(index) ? selected : [index]
-        return indices.filter { $0 < shown.count }.map { shown[$0] }
+        let selected = collection.selectionIndexPaths.map(\.item)
+        return HistoryRules.targets(around: index, selected: selected, count: shown.count).map { shown[$0] }
     }
 
     private func edit(at index: Int) {
