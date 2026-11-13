@@ -6,6 +6,16 @@ public enum StitchRows {
     /// Pixels at the right edge never matched: the scroll bar fades in and moves while scrolling.
     public static let scrollBarWidth = 24
 
+    /// Fewer moving rows than this (between the still bands) are too few to match: the frame is skipped.
+    public static let minimumSpan = 24
+
+    /// The scroll distance for a frame whose moving rows are `lo..<hi`, or nil when there are fewer than
+    /// `minimumSpan` of them or no shift matches.
+    public static func continuingShift(_ old: [UInt64], _ new: [UInt64], lo: Int, hi: Int) -> Int? {
+        guard hi - lo >= minimumSpan else { return nil }
+        return shift(old, new, lo: lo, hi: hi)
+    }
+
     /// The scroll distance in rows: the smallest shift `s` where the new frame's rows from `lo` match the
     /// previous frame's from `lo + s` best (at least 90% of the overlap, which must be a sixth of the span).
     public static func shift(_ old: [UInt64], _ new: [UInt64], lo: Int, hi: Int) -> Int? {
