@@ -444,5 +444,28 @@ equal("width: a letter is not a width", "\(StrokeWidth.forKey("a") == nil)", "tr
 equal("width: two digits are not a width", "\(StrokeWidth.forKey("12") == nil)", "true")
 equal("width: no key is not a width", "\(StrokeWidth.forKey("") == nil)", "true")
 
+// Where a pin window opens (K24), pinned from PinWindow.init before moving it into KarutaCore:
+// the capture's real size, shrunk to fit 80% of the visible screen, centred on the card, kept on screen.
+let pinVisible = CGRect(x: 0, y: 0, width: 1440, height: 900)
+func pinFrame(_ width: CGFloat, _ height: CGFloat, around card: CGRect, visible: CGRect = pinVisible) -> String {
+    rectText(PinLayout.frame(pointSize: CGSize(width: width, height: height), around: card, visible: visible))
+}
+equal("pin: a small capture opens at its real size, centred on the card",
+      pinFrame(200, 100, around: CGRect(x: 100, y: 100, width: 300, height: 200)), "150.0,150.0 200.0x100.0")
+equal("pin: a wide capture shrinks to 80% of the screen's width",
+      pinFrame(1600, 400, around: CGRect(x: 0, y: 0, width: 1000, height: 1000), visible: CGRect(x: 0, y: 0, width: 1000, height: 1000)),
+      "100.0,400.0 800.0x200.0")
+equal("pin: a tall capture shrinks to 80% of the screen's height",
+      pinFrame(500, 2000, around: CGRect(x: 0, y: 0, width: 1000, height: 1000), visible: CGRect(x: 0, y: 0, width: 1000, height: 1000)),
+      "400.0,100.0 200.0x800.0")
+equal("pin: pushed back from the right edge",
+      pinFrame(200, 100, around: CGRect(x: 1350, y: 400, width: 100, height: 100)), "1240.0,400.0 200.0x100.0")
+equal("pin: pushed up from the bottom-left corner, above the Dock",
+      pinFrame(200, 100, around: CGRect(x: 0, y: 0, width: 100, height: 20), visible: CGRect(x: 0, y: 25, width: 1440, height: 850)),
+      "0.0,25.0 200.0x100.0")
+equal("pin: on a screen to the left of the main one",
+      pinFrame(400, 300, around: CGRect(x: -1010, y: 450, width: 100, height: 100), visible: CGRect(x: -1920, y: 0, width: 1920, height: 1055)),
+      "-1160.0,350.0 400.0x300.0")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)

@@ -1,4 +1,5 @@
 import AppKit
+import KarutaCore
 
 /// A capture floating above all windows, like CleanShot's Pin. Drag to move, scroll to zoom,
 /// ⌥ + scroll to change opacity, arrow keys to nudge (Shift: 10pt), ⌘C to copy,
@@ -19,13 +20,9 @@ final class PinWindow: NSPanel {
         aspect = pointSize.height / max(pointSize.width, 1)
         // Open at the capture's real size, centred where the overlay card was, but keep it on screen.
         let visible = NSScreen.screens.first { $0.frame.intersects(frame) }?.visibleFrame ?? frame
-        let scale = min(1, visible.width * 0.8 / pointSize.width, visible.height * 0.8 / pointSize.height)
-        let size = NSSize(width: pointSize.width * scale, height: pointSize.height * scale)
-        var origin = NSPoint(x: frame.midX - size.width / 2, y: frame.midY - size.height / 2)
-        origin.x = min(max(origin.x, visible.minX), visible.maxX - size.width)
-        origin.y = min(max(origin.y, visible.minY), visible.maxY - size.height)
+        let contentRect = PinLayout.frame(pointSize: pointSize, around: frame, visible: visible)
 
-        super.init(contentRect: NSRect(origin: origin, size: size),
+        super.init(contentRect: contentRect,
                    styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         level = .floating
         hasShadow = true
