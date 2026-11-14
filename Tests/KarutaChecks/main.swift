@@ -532,5 +532,18 @@ equal("saved colour hex: rrggbbaa", ColorHex.rgba(red: 0.2, green: 0.4, blue: 0.
 equal("saved colour hex: always 8 digits", ColorHex.rgba(red: 0, green: 0, blue: 0, alpha: 0), "00000000")
 equal("saved colour hex: opaque red", ColorHex.rgba(red: 1, green: 0, blue: 0, alpha: 1), "ff0000ff")
 
+// The backdrop's padding (K29), pinned from Backdrop.padding(for:) before moving it into KarutaCore:
+// the setting's percent of the image's shorter side, at least 12pt, rounded.
+func backdropPadding(_ percent: Int, _ width: CGFloat, _ height: CGFloat) -> String {
+    "\(BackdropLayout.padding(percent: percent, size: CGSize(width: width, height: height)))"
+}
+equal("backdrop padding: a percent of the shorter side", backdropPadding(10, 800, 600), "60.0")
+equal("backdrop padding: the default 8%", backdropPadding(8, 1200, 900), "72.0")
+equal("backdrop padding: a tall image uses its width", backdropPadding(10, 300, 1000), "30.0")
+equal("backdrop padding: at least 12pt", backdropPadding(10, 100, 50), "12.0")
+equal("backdrop padding: 0% is still 12pt", backdropPadding(0, 800, 600), "12.0")
+equal("backdrop padding: rounded down", backdropPadding(7, 333, 500), "23.0")
+equal("backdrop padding: a half rounds up", backdropPadding(5, 1010, 1010), "51.0")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
