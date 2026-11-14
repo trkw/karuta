@@ -101,7 +101,7 @@ extension CanvasView {
         commit(annotations + [preview])
     }
 
-    static let widthSteps: [CGFloat] = [1, 2, 4, 6, 8, 12]
+    static let widthSteps: [CGFloat] = StrokeWidth.steps
 
     private static func rect(from a: NSPoint, to b: NSPoint, square: Bool) -> NSRect {
         DrawGeometry.rect(from: a, to: b, square: square)

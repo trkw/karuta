@@ -433,5 +433,16 @@ equal("counter: negative numbers count as none", nextCounter([-3]), "1")
 equal("counter: setting a number below 0 keeps 0", "\(CounterNumbers.clamped(-5))", "0")
 equal("counter: setting a number keeps it", "\(CounterNumbers.clamped(7))", "7")
 
+// Stroke widths (K23), pinned from CanvasView.widthSteps and the 1–6 keys before moving them into KarutaCore.
+equal("width: the six steps", StrokeWidth.steps.map { "\($0)" }.joined(separator: ","), "1.0,2.0,4.0,6.0,8.0,12.0")
+equal("width: key 1 is the thinnest", "\(StrokeWidth.forKey("1") ?? -1)", "1.0")
+equal("width: key 4", "\(StrokeWidth.forKey("4") ?? -1)", "6.0")
+equal("width: key 6 is the thickest", "\(StrokeWidth.forKey("6") ?? -1)", "12.0")
+equal("width: key 0 is not a width", "\(StrokeWidth.forKey("0") == nil)", "true")
+equal("width: key 7 is not a width", "\(StrokeWidth.forKey("7") == nil)", "true")
+equal("width: a letter is not a width", "\(StrokeWidth.forKey("a") == nil)", "true")
+equal("width: two digits are not a width", "\(StrokeWidth.forKey("12") == nil)", "true")
+equal("width: no key is not a width", "\(StrokeWidth.forKey("") == nil)", "true")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
