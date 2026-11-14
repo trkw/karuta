@@ -1,4 +1,5 @@
 import AppKit
+import KarutaCore
 
 // The keyboard: tool keys, Delete, Esc, background and zoom.
 extension CanvasView {
@@ -11,8 +12,8 @@ extension CanvasView {
             return
         }
         // 1–6: stroke width, thin to thick.
-        if modifiers.isEmpty, let digit = Int(key), (1 ... 6).contains(digit) {
-            lineWidth = Self.widthSteps[digit - 1]
+        if modifiers.isEmpty, let width = StrokeWidth.forKey(key) {
+            lineWidth = width
             onStateChange?()
             return
         }
