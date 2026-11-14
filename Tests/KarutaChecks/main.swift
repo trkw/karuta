@@ -467,5 +467,22 @@ equal("pin: on a screen to the left of the main one",
       pinFrame(400, 300, around: CGRect(x: -1010, y: 450, width: 100, height: 100), visible: CGRect(x: -1920, y: 0, width: 1920, height: 1055)),
       "-1160.0,350.0 400.0x300.0")
 
+// A pin window's scroll rules (K25), pinned from PinWindow.scrollWheel before moving them into KarutaCore:
+// a mouse wheel counts 8 times, scrolling zooms (width 60–4000, aspect kept, centre kept), ⌥ changes opacity (0.2–1).
+func r1(_ r: CGRect) -> String { String(format: "%.1f,%.1f %.1fx%.1f", r.minX, r.minY, r.width, r.height) }
+equal("pin scroll: a trackpad's delta is used as it is", "\(PinLayout.scrollDelta(3, precise: true))", "3.0")
+equal("pin scroll: a mouse wheel's delta counts 8 times", "\(PinLayout.scrollDelta(3, precise: false))", "24.0")
+equal("pin scroll: down on a wheel too", "\(PinLayout.scrollDelta(-1, precise: false))", "-8.0")
+equal("pin opacity: a step of delta / 200", String(format: "%.2f", PinLayout.opacity(0.5, delta: -40)), "0.30")
+equal("pin opacity: no more than 1", String(format: "%.2f", PinLayout.opacity(1, delta: 20)), "1.00")
+equal("pin opacity: no less than 0.2", String(format: "%.2f", PinLayout.opacity(0.3, delta: -100)), "0.20")
+let pinZoomFrame = CGRect(x: 100, y: 100, width: 200, height: 100)
+equal("pin zoom: 1 + delta / 300 times wider, aspect and centre kept",
+      r1(PinLayout.zoomed(pinZoomFrame, delta: 30, aspect: 0.5)), "90.0,95.0 220.0x110.0")
+equal("pin zoom: no narrower than 60",
+      r1(PinLayout.zoomed(CGRect(x: 0, y: 0, width: 61, height: 61), delta: -300, aspect: 1)), "0.5,0.5 60.0x60.0")
+equal("pin zoom: no wider than 4000",
+      r1(PinLayout.zoomed(CGRect(x: 0, y: 0, width: 3900, height: 1950), delta: 300, aspect: 0.5)), "-50.0,-25.0 4000.0x2000.0")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
