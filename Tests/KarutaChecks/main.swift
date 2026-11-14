@@ -419,5 +419,19 @@ equal("card: right, hidden, past the edge and the gap", cardX(onRight: true, hid
 equal("card: hidden with no gap (where it slides in from)", cardX(onRight: false, hidden: true, gap: 0), "-300.0")
 equal("card: on a second screen to the right", cardX(onRight: true, hidden: false, screen: CGRect(x: 1440, y: 0, width: 1920, height: 1080)), "3044.0")
 
+// The next counter number in the editor (K22), pinned from CanvasView.nextCounter before moving it into KarutaCore.
+func nextCounter(_ existing: [Int], override: Int? = nil) -> String {
+    "\(CounterNumbers.next(existing: existing, override: override))"
+}
+equal("counter: the first is 1", nextCounter([]), "1")
+equal("counter: one past the highest", nextCounter([1, 2, 3]), "4")
+equal("counter: gaps are not filled", nextCounter([1, 5]), "6")
+equal("counter: order does not matter", nextCounter([3, 1, 2]), "4")
+equal("counter: a number set by hand wins", nextCounter([1, 2], override: 10), "10")
+equal("counter: a set number of 0 is kept", nextCounter([1, 2], override: 0), "0")
+equal("counter: negative numbers count as none", nextCounter([-3]), "1")
+equal("counter: setting a number below 0 keeps 0", "\(CounterNumbers.clamped(-5))", "0")
+equal("counter: setting a number keeps it", "\(CounterNumbers.clamped(7))", "7")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
