@@ -88,16 +88,13 @@ final class PinWindow: NSPanel {
     }
 
     override func scrollWheel(with event: NSEvent) {
-        let delta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.scrollingDeltaY * 8
+        let delta = PinLayout.scrollDelta(event.scrollingDeltaY, precise: event.hasPreciseScrollingDeltas)
         if event.modifierFlags.contains(.option) {
-            opacity = min(1, max(0.2, opacity + delta / 200))
+            opacity = PinLayout.opacity(opacity, delta: delta)
             applyOpacity()
             return
         }
-        let width = min(max(frame.width * (1 + delta / 300), 60), 4000)
-        let size = NSSize(width: width, height: width * aspect)
-        setFrame(NSRect(x: frame.midX - size.width / 2, y: frame.midY - size.height / 2,
-                        width: size.width, height: size.height), display: true)
+        setFrame(PinLayout.zoomed(frame, delta: delta, aspect: aspect), display: true)
     }
 
     override func keyDown(with event: NSEvent) {

@@ -14,4 +14,23 @@ public enum PinLayout {
         origin.y = min(max(origin.y, visible.minY), visible.maxY - size.height)
         return CGRect(origin: origin, size: size)
     }
+
+    /// A scroll's vertical delta: a mouse wheel's coarse steps count 8 times, a trackpad's as they are (K25).
+    public static func scrollDelta(_ deltaY: CGFloat, precise: Bool) -> CGFloat {
+        precise ? deltaY : deltaY * 8
+    }
+
+    /// The opacity after an ⌥-scroll of `delta`, kept between 0.2 and 1.
+    public static func opacity(_ current: CGFloat, delta: CGFloat) -> CGFloat {
+        min(1, max(0.2, current + delta / 200))
+    }
+
+    /// `frame` zoomed by a scroll of `delta`: 1 + delta/300 times as wide (60–4000), `aspect` (height / width)
+    /// kept, around the same centre.
+    public static func zoomed(_ frame: CGRect, delta: CGFloat, aspect: CGFloat) -> CGRect {
+        let width = min(max(frame.width * (1 + delta / 300), 60), 4000)
+        let size = CGSize(width: width, height: width * aspect)
+        return CGRect(x: frame.midX - size.width / 2, y: frame.midY - size.height / 2,
+                      width: size.width, height: size.height)
+    }
 }
