@@ -1,4 +1,5 @@
 import AppKit
+import KarutaCore
 
 // MARK: - Panel
 
@@ -14,11 +15,7 @@ final class ScrollPanel: NSPanel {
 
     init(below rect: CGRect, on screen: NSScreen) {
         let panelSize = NSSize(width: 420, height: 44)
-        let visible = screen.visibleFrame
-        var origin = NSPoint(x: rect.midX - panelSize.width / 2, y: rect.minY - panelSize.height - 12)
-        if origin.y < visible.minY { origin.y = min(rect.maxY + 12, visible.maxY - panelSize.height) }
-        if origin.y + panelSize.height > visible.maxY { origin.y = rect.minY + 12 } // area fills the screen: inside it
-        origin.x = min(max(origin.x, visible.minX + 8), visible.maxX - panelSize.width - 8)
+        let origin = PanelLayout.scrollPanelOrigin(below: rect, panelSize: panelSize, visible: screen.visibleFrame)
         super.init(contentRect: NSRect(origin: origin, size: panelSize), styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
         level = .screenSaver
