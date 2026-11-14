@@ -484,5 +484,19 @@ equal("pin zoom: no narrower than 60",
 equal("pin zoom: no wider than 4000",
       r1(PinLayout.zoomed(CGRect(x: 0, y: 0, width: 3900, height: 1950), delta: 300, aspect: 0.5)), "-50.0,-25.0 4000.0x2000.0")
 
+// A Quick Access card's size (K26), pinned from QuickOverlayCard.init before moving it into CardLayout:
+// the width from the settings, the height from the image's aspect, kept between 0.4 and 1 times the width.
+func cardSize(_ imageWidth: Int, _ imageHeight: Int, width: CGFloat = 300) -> String {
+    let size = CardLayout.size(width: width, imageWidth: imageWidth, imageHeight: imageHeight)
+    return "\(size.width)x\(size.height)"
+}
+equal("card size: a 16:9 capture keeps its shape", cardSize(1600, 900), "300.0x168.75")
+equal("card size: a wide strip is at least 0.4 of the width", cardSize(3000, 100), "300.0x120.0")
+equal("card size: a tall capture is at most as high as wide", cardSize(100, 1000), "300.0x300.0")
+equal("card size: a square is square", cardSize(500, 500), "300.0x300.0")
+equal("card size: an image 0 wide counts as 1 wide", cardSize(0, 50), "300.0x300.0")
+equal("card size: an image 0 high is at the 0.4 floor", cardSize(100, 0), "300.0x120.0")
+equal("card size: follows the width setting", cardSize(1600, 900, width: 200), "200.0x112.5")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
