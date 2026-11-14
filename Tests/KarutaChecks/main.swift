@@ -599,5 +599,9 @@ equal("shortcut: a key in no table shows its code", shortcutText(kVK_Home, cmdKe
 equal("shortcut: function keys are known", "\(ShortcutText.functionKeys[kVK_F1] ?? "")", "F1")
 equal("shortcut: menu characters are known", "\(ShortcutText.characters[kVK_ANSI_C] ?? "")", "C")
 
+// The editor's zoom choices (K33), pinned from Editor.zoomChoices before moving them into KarutaCore.
+equal("zoom: the labels, in order", EditorZoom.choices.map(\.label).joined(separator: ","), "フィット,50%,100%,200%")
+equal("zoom: the scales, fit is none", EditorZoom.choices.map { $0.scale.map { "\($0)" } ?? "fit" }.joined(separator: ","), "fit,0.5,1.0,2.0")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)

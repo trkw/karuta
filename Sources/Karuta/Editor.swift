@@ -1,4 +1,5 @@
 import AppKit
+import KarutaCore
 import UniformTypeIdentifiers
 
 /// CleanShot-style annotation editor: a dark window with the tools in a unified toolbar
@@ -24,7 +25,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSTool
     var optionsSegment: NSSegmentedControl?
     var counterField: NSTextField?
     var usesColorPanel = false
-    static let zoomChoices: [(String, CGFloat?)] = [("フィット", nil), ("50%", 0.5), ("100%", 1), ("200%", 2)]
+    static let zoomChoices: [(String, CGFloat?)] = EditorZoom.choices.map { ($0.label, $0.scale) }
 
     static let colors: [NSColor] = [
         .systemRed, .systemOrange, .systemYellow, .systemGreen, .systemBlue, .systemPurple, .white, .black,
