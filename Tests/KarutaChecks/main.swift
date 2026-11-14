@@ -545,5 +545,23 @@ equal("backdrop padding: 0% is still 12pt", backdropPadding(0, 800, 600), "12.0"
 equal("backdrop padding: rounded down", backdropPadding(7, 333, 500), "23.0")
 equal("backdrop padding: a half rounds up", backdropPadding(5, 1010, 1010), "51.0")
 
+// Guessing a shot's scale (K30), pinned from Recents.swift before moving it into KarutaCore: from a pasted
+// image (pixels per point, rounded, at least 1) and from a file's DPI (DPI / 72, rounded, at least 1).
+func scaleFromPixels(_ pixels: Int, _ points: CGFloat) -> String { "\(ShotScale.fromPixels(pixelWidth: pixels, pointWidth: points))" }
+func scaleFromDPI(_ dpi: Double) -> String { "\(ShotScale.fromDPI(dpi))" }
+equal("scale from pixels: Retina is 2", scaleFromPixels(2000, 1000), "2.0")
+equal("scale from pixels: same size is 1", scaleFromPixels(1000, 1000), "1.0")
+equal("scale from pixels: a half rounds up", scaleFromPixels(1500, 1000), "2.0")
+equal("scale from pixels: a little more rounds down", scaleFromPixels(1200, 1000), "1.0")
+equal("scale from pixels: smaller than the points is still 1", scaleFromPixels(500, 1000), "1.0")
+equal("scale from pixels: 0 points count as 1", scaleFromPixels(3000, 0), "3000.0")
+equal("scale from DPI: 72 is 1", scaleFromDPI(72), "1.0")
+equal("scale from DPI: 144 is 2", scaleFromDPI(144), "2.0")
+equal("scale from DPI: 216 is 3", scaleFromDPI(216), "3.0")
+equal("scale from DPI: a half rounds up", scaleFromDPI(108), "2.0")
+equal("scale from DPI: a little more rounds down", scaleFromDPI(90), "1.0")
+equal("scale from DPI: low DPI is still 1", scaleFromDPI(36), "1.0")
+equal("scale from DPI: 0 is 1", scaleFromDPI(0), "1.0")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)

@@ -1,5 +1,6 @@
 import AppKit
 import ImageIO
+import KarutaCore
 import UniformTypeIdentifiers
 
 /// Turns image files and the clipboard into a `Shot`, reading the DPI so Retina images keep their point size.
@@ -27,7 +28,7 @@ enum ImageLoader {
         guard let image = NSImage(pasteboard: pasteboard),
               let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
         else { return nil }
-        return Shot(image: cgImage, scale: max(1, CGFloat(cgImage.width) / max(image.size.width, 1)).rounded())
+        return Shot(image: cgImage, scale: ShotScale.fromPixels(pixelWidth: cgImage.width, pointWidth: image.size.width))
     }
 
     /// Asks for an image file (for "open in the editor" and "pin").
@@ -59,7 +60,7 @@ enum ImageLoader {
             image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
         }
         guard let image else { return nil }
-        return Shot(image: image, scale: max(1, (CGFloat(dpi) / 72).rounded()))
+        return Shot(image: image, scale: ShotScale.fromDPI(dpi))
     }
 }
 
