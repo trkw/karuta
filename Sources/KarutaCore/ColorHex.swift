@@ -20,4 +20,17 @@ public enum ColorHex {
         let value = byte(red) << 24 | byte(green) << 16 | byte(blue) << 8 | byte(alpha)
         return String(format: "%08x", value)
     }
+
+    /// The backdrop colour read back: red, green and blue bytes, from any hex that fits in 32 bits (so the
+    /// unpadded "0" is black), or nil when it does not read as hex (K31).
+    public static func rgbBytes(_ hex: String) -> [UInt32]? {
+        guard let value = UInt32(hex, radix: 16) else { return nil }
+        return [value >> 16 & 0xFF, value >> 8 & 0xFF, value & 0xFF]
+    }
+
+    /// A saved editor colour read back: red, green, blue and alpha bytes from exactly 8 hex digits, or nil.
+    public static func rgbaBytes(_ hex: String) -> [UInt32]? {
+        guard hex.count == 8, let value = UInt32(hex, radix: 16) else { return nil }
+        return [value >> 24 & 0xFF, value >> 16 & 0xFF, value >> 8 & 0xFF, value & 0xFF]
+    }
 }
