@@ -563,5 +563,22 @@ equal("scale from DPI: a little more rounds down", scaleFromDPI(90), "1.0")
 equal("scale from DPI: low DPI is still 1", scaleFromDPI(36), "1.0")
 equal("scale from DPI: 0 is 1", scaleFromDPI(0), "1.0")
 
+// Reading the settings' colour hex (K31, the other half of K28), pinned from Preferences.backdropColor's getter
+// and Preferences.color(hex:) before moving the parsing into KarutaCore. Saved strings must keep reading the same.
+func bytes(_ b: [UInt32]?) -> String { b.map { $0.map(String.init).joined(separator: ",") } ?? "none" }
+equal("read backdrop hex: rrggbb", bytes(ColorHex.rgbBytes("ff8000")), "255,128,0")
+equal("read backdrop hex: \"0\" as saved for black", bytes(ColorHex.rgbBytes("0")), "0,0,0")
+equal("read backdrop hex: \"ff00\" as saved for green", bytes(ColorHex.rgbBytes("ff00")), "0,255,0")
+equal("read backdrop hex: upper case", bytes(ColorHex.rgbBytes("FF8000")), "255,128,0")
+equal("read backdrop hex: 7 digits keep the low 6", bytes(ColorHex.rgbBytes("1abcdef")), "171,205,239")
+equal("read backdrop hex: 9 digits do not fit", bytes(ColorHex.rgbBytes("123456789")), "none")
+equal("read backdrop hex: not hex", bytes(ColorHex.rgbBytes("zz")), "none")
+equal("read backdrop hex: empty", bytes(ColorHex.rgbBytes("")), "none")
+equal("read saved colour hex: rrggbbaa", bytes(ColorHex.rgbaBytes("336699cc")), "51,102,153,204")
+equal("read saved colour hex: written and read back", bytes(ColorHex.rgbaBytes(ColorHex.rgba(red: 1, green: 0, blue: 0, alpha: 1))), "255,0,0,255")
+equal("read saved colour hex: 7 digits are not read", bytes(ColorHex.rgbaBytes("336699c")), "none")
+equal("read saved colour hex: 9 digits are not read", bytes(ColorHex.rgbaBytes("336699ccd")), "none")
+equal("read saved colour hex: not hex", bytes(ColorHex.rgbaBytes("gggggggg")), "none")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)

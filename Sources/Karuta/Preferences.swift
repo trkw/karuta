@@ -224,11 +224,10 @@ enum Preferences {
 
     static var backdropColor: NSColor {
         get {
-            guard let hex = defaults.string(forKey: Key.backdropColor.rawValue), let value = UInt32(hex, radix: 16) else {
+            guard let hex = defaults.string(forKey: Key.backdropColor.rawValue), let rgb = ColorHex.rgbBytes(hex) else {
                 return NSColor(srgbRed: 0.95, green: 0.95, blue: 0.97, alpha: 1)
             }
-            return NSColor(srgbRed: CGFloat(value >> 16 & 0xFF) / 255, green: CGFloat(value >> 8 & 0xFF) / 255,
-                           blue: CGFloat(value & 0xFF) / 255, alpha: 1)
+            return NSColor(srgbRed: CGFloat(rgb[0]) / 255, green: CGFloat(rgb[1]) / 255, blue: CGFloat(rgb[2]) / 255, alpha: 1)
         }
         set {
             let rgb = newValue.usingColorSpace(.sRGB) ?? .white
@@ -295,9 +294,9 @@ enum Preferences {
     }
 
     private static func color(hex: String) -> NSColor? {
-        guard hex.count == 8, let value = UInt32(hex, radix: 16) else { return nil }
-        return NSColor(srgbRed: CGFloat(value >> 24 & 0xFF) / 255, green: CGFloat(value >> 16 & 0xFF) / 255,
-                       blue: CGFloat(value >> 8 & 0xFF) / 255, alpha: CGFloat(value & 0xFF) / 255)
+        guard let rgba = ColorHex.rgbaBytes(hex) else { return nil }
+        return NSColor(srgbRed: CGFloat(rgba[0]) / 255, green: CGFloat(rgba[1]) / 255,
+                       blue: CGFloat(rgba[2]) / 255, alpha: CGFloat(rgba[3]) / 255)
     }
 
     /// A picture chosen for the `.image` style.
