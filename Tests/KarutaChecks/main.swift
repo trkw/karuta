@@ -498,5 +498,25 @@ equal("card size: an image 0 wide counts as 1 wide", cardSize(0, 50), "300.0x300
 equal("card size: an image 0 high is at the 0.4 floor", cardSize(100, 0), "300.0x120.0")
 equal("card size: follows the width setting", cardSize(1600, 900, width: 200), "200.0x112.5")
 
+// Where the scrolling capture's panel sits (K27), pinned from ScrollPanel.init before moving it into KarutaCore:
+// 12pt under the area, above it when that would leave the screen, and 8pt in from the screen's sides.
+let panelVisible = CGRect(x: 0, y: 0, width: 1440, height: 875)
+func panelOrigin(_ area: CGRect, visible: CGRect = panelVisible) -> String {
+    let p = PanelLayout.scrollPanelOrigin(below: area, panelSize: CGSize(width: 420, height: 44), visible: visible)
+    return "\(p.x),\(p.y)"
+}
+equal("scroll panel: centred 12pt under the area", panelOrigin(CGRect(x: 400, y: 400, width: 400, height: 300)), "390.0,344.0")
+equal("scroll panel: above the area when below would leave the screen",
+      panelOrigin(CGRect(x: 400, y: 30, width: 400, height: 300)), "390.0,342.0")
+equal("scroll panel: an area filling the screen puts it at the top, inside",
+      panelOrigin(CGRect(x: 0, y: 0, width: 1440, height: 875)), "510.0,831.0")
+equal("scroll panel: an area above the visible frame (as today) puts it 12pt up from the area's bottom",
+      panelOrigin(CGRect(x: 400, y: 900, width: 100, height: 50)), "240.0,912.0")
+equal("scroll panel: 8pt in from the left", panelOrigin(CGRect(x: 0, y: 400, width: 100, height: 100)), "8.0,344.0")
+equal("scroll panel: 8pt in from the right", panelOrigin(CGRect(x: 1400, y: 400, width: 40, height: 100)), "1012.0,344.0")
+equal("scroll panel: on a screen to the left",
+      panelOrigin(CGRect(x: -1000, y: 400, width: 400, height: 300), visible: CGRect(x: -1920, y: 0, width: 1920, height: 1055)),
+      "-1010.0,344.0")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
