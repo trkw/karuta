@@ -232,9 +232,7 @@ enum Preferences {
         }
         set {
             let rgb = newValue.usingColorSpace(.sRGB) ?? .white
-            func byte(_ c: CGFloat) -> UInt32 { UInt32((min(max(c, 0), 1) * 255).rounded()) }
-            let value = byte(rgb.redComponent) << 16 | byte(rgb.greenComponent) << 8 | byte(rgb.blueComponent)
-            set(String(value, radix: 16), for: .backdropColor)
+            set(ColorHex.rgb(red: rgb.redComponent, green: rgb.greenComponent, blue: rgb.blueComponent), for: .backdropColor)
         }
     }
 
@@ -292,10 +290,8 @@ enum Preferences {
     /// "rrggbbaa" in sRGB.
     private static func hex(of color: NSColor) -> String {
         let rgb = color.usingColorSpace(.sRGB) ?? .black
-        func byte(_ c: CGFloat) -> UInt32 { UInt32((min(max(c, 0), 1) * 255).rounded()) }
-        let value = byte(rgb.redComponent) << 24 | byte(rgb.greenComponent) << 16 | byte(rgb.blueComponent) << 8
-            | byte(rgb.alphaComponent)
-        return String(format: "%08x", value)
+        return ColorHex.rgba(red: rgb.redComponent, green: rgb.greenComponent, blue: rgb.blueComponent,
+                             alpha: rgb.alphaComponent)
     }
 
     private static func color(hex: String) -> NSColor? {

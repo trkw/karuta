@@ -518,5 +518,19 @@ equal("scroll panel: on a screen to the left",
       panelOrigin(CGRect(x: -1000, y: 400, width: 400, height: 300), visible: CGRect(x: -1920, y: 0, width: 1920, height: 1055)),
       "-1010.0,344.0")
 
+// The settings' colour hex (K28), pinned from Preferences.backdropColor's setter and Preferences.hex(of:) before
+// moving their one formula into KarutaCore. These strings are what is saved, so they must not change.
+equal("colour byte: 0 is 0", "\(ColorHex.byte(0))", "0")
+equal("colour byte: 1 is 255", "\(ColorHex.byte(1))", "255")
+equal("colour byte: a half rounds up", "\(ColorHex.byte(0.5))", "128")
+equal("colour byte: below 0 is 0", "\(ColorHex.byte(-0.2))", "0")
+equal("colour byte: above 1 is 255", "\(ColorHex.byte(1.3))", "255")
+equal("backdrop hex: rrggbb", ColorHex.rgb(red: 1, green: 0.5, blue: 0), "ff8000")
+equal("backdrop hex: not padded (black is \"0\"), as saved today", ColorHex.rgb(red: 0, green: 0, blue: 0), "0")
+equal("backdrop hex: not padded (green is \"ff00\")", ColorHex.rgb(red: 0, green: 1, blue: 0), "ff00")
+equal("saved colour hex: rrggbbaa", ColorHex.rgba(red: 0.2, green: 0.4, blue: 0.6, alpha: 0.8), "336699cc")
+equal("saved colour hex: always 8 digits", ColorHex.rgba(red: 0, green: 0, blue: 0, alpha: 0), "00000000")
+equal("saved colour hex: opaque red", ColorHex.rgba(red: 1, green: 0, blue: 0, alpha: 1), "ff0000ff")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
