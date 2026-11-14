@@ -1,5 +1,6 @@
 // `make test`: checks for KarutaCore. A plain executable because the Command Line Tools have
 // neither XCTest nor the Swift Testing macros. Exits 1 when any check fails.
+import Carbon.HIToolbox
 import Foundation
 import KarutaCore
 
@@ -579,6 +580,24 @@ equal("read saved colour hex: written and read back", bytes(ColorHex.rgbaBytes(C
 equal("read saved colour hex: 7 digits are not read", bytes(ColorHex.rgbaBytes("336699c")), "none")
 equal("read saved colour hex: 9 digits are not read", bytes(ColorHex.rgbaBytes("336699ccd")), "none")
 equal("read saved colour hex: not hex", bytes(ColorHex.rgbaBytes("gggggggg")), "none")
+
+// How a shortcut is shown in the settings (K32), pinned from Shortcut.displayString before moving it into
+// KarutaCore: the modifier symbols in the order ⌃⌥⇧⌘, then the key's name from three tables, or "#code".
+func shortcutText(_ key: Int, _ modifiers: Int = 0) -> String {
+    ShortcutText.display(keyCode: UInt32(key), modifiers: UInt32(modifiers))
+}
+equal("shortcut: ⌘⇧4 (the area default)", shortcutText(kVK_ANSI_4, cmdKey | shiftKey), "⇧⌘4")
+equal("shortcut: every modifier, in ⌃⌥⇧⌘ order", shortcutText(kVK_ANSI_A, cmdKey | shiftKey | optionKey | controlKey), "⌃⌥⇧⌘A")
+equal("shortcut: letters are upper case", shortcutText(kVK_ANSI_Z, cmdKey), "⌘Z")
+equal("shortcut: a symbol key", shortcutText(kVK_ANSI_Slash, optionKey), "⌥/")
+equal("shortcut: a function key alone", shortcutText(kVK_F5), "F5")
+equal("shortcut: F12", shortcutText(kVK_F12, controlKey), "⌃F12")
+equal("shortcut: space", shortcutText(kVK_Space, cmdKey), "⌘Space")
+equal("shortcut: an arrow", shortcutText(kVK_LeftArrow, optionKey), "⌥←")
+equal("shortcut: escape", shortcutText(kVK_Escape), "⎋")
+equal("shortcut: a key in no table shows its code", shortcutText(kVK_Home, cmdKey), "⌘#\(kVK_Home)")
+equal("shortcut: function keys are known", "\(ShortcutText.functionKeys[kVK_F1] ?? "")", "F1")
+equal("shortcut: menu characters are known", "\(ShortcutText.characters[kVK_ANSI_C] ?? "")", "C")
 
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
