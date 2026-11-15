@@ -7,27 +7,8 @@ import UniformTypeIdentifiers
 enum Preferences {
     static let didChange = Notification.Name("KarutaPreferencesDidChange")
 
-    enum ImageFormat: String, CaseIterable {
-        case png, jpeg, heic
-
-        var fileExtension: String {
-            switch self {
-            case .png: "png"
-            case .jpeg: "jpg"
-            case .heic: "heic"
-            }
-        }
-
-        var utType: UTType {
-            switch self {
-            case .png: .png
-            case .jpeg: .jpeg
-            case .heic: .heic
-            }
-        }
-
-        var title: String { rawValue.uppercased() }
-    }
+    /// The image formats now live in KarutaCore (K5); the name stays so callers are unchanged.
+    typealias ImageFormat = KarutaCore.ImageFormat
 
     private static let defaults = UserDefaults.standard
     private typealias Key = PreferenceKey
@@ -243,17 +224,14 @@ enum Preferences {
 
     static var backdropColor: NSColor {
         get {
-            guard let hex = defaults.string(forKey: Key.backdropColor.rawValue), let value = UInt32(hex, radix: 16) else {
+            guard let hex = defaults.string(forKey: Key.backdropColor.rawValue), let rgb = ColorHex.rgbBytes(hex) else {
                 return NSColor(srgbRed: 0.95, green: 0.95, blue: 0.97, alpha: 1)
             }
-            return NSColor(srgbRed: CGFloat(value >> 16 & 0xFF) / 255, green: CGFloat(value >> 8 & 0xFF) / 255,
-                           blue: CGFloat(value & 0xFF) / 255, alpha: 1)
+            return NSColor(srgbRed: CGFloat(rgb[0]) / 255, green: CGFloat(rgb[1]) / 255, blue: CGFloat(rgb[2]) / 255, alpha: 1)
         }
         set {
             let rgb = newValue.usingColorSpace(.sRGB) ?? .white
-            func byte(_ c: CGFloat) -> UInt32 { UInt32((min(max(c, 0), 1) * 255).rounded()) }
-            let value = byte(rgb.redComponent) << 16 | byte(rgb.greenComponent) << 8 | byte(rgb.blueComponent)
-            set(String(value, radix: 16), for: .backdropColor)
+            set(ColorHex.rgb(red: rgb.redComponent, green: rgb.greenComponent, blue: rgb.blueComponent), for: .backdropColor)
         }
     }
 
@@ -311,16 +289,14 @@ enum Preferences {
     /// "rrggbbaa" in sRGB.
     private static func hex(of color: NSColor) -> String {
         let rgb = color.usingColorSpace(.sRGB) ?? .black
-        func byte(_ c: CGFloat) -> UInt32 { UInt32((min(max(c, 0), 1) * 255).rounded()) }
-        let value = byte(rgb.redComponent) << 24 | byte(rgb.greenComponent) << 16 | byte(rgb.blueComponent) << 8
-            | byte(rgb.alphaComponent)
-        return String(format: "%08x", value)
+        return ColorHex.rgba(red: rgb.redComponent, green: rgb.greenComponent, blue: rgb.blueComponent,
+                             alpha: rgb.alphaComponent)
     }
 
     private static func color(hex: String) -> NSColor? {
-        guard hex.count == 8, let value = UInt32(hex, radix: 16) else { return nil }
-        return NSColor(srgbRed: CGFloat(value >> 24 & 0xFF) / 255, green: CGFloat(value >> 16 & 0xFF) / 255,
-                       blue: CGFloat(value >> 8 & 0xFF) / 255, alpha: CGFloat(value & 0xFF) / 255)
+        guard let rgba = ColorHex.rgbaBytes(hex) else { return nil }
+        return NSColor(srgbRed: CGFloat(rgba[0]) / 255, green: CGFloat(rgba[1]) / 255,
+                       blue: CGFloat(rgba[2]) / 255, alpha: CGFloat(rgba[3]) / 255)
     }
 
     /// A picture chosen for the `.image` style.
@@ -486,14 +462,14 @@ struct Shortcut: Equatable {
         if flags.contains(.shift) { carbon |= UInt32(shiftKey) }
         if flags.contains(.option) { carbon |= UInt32(optionKey) }
         if flags.contains(.control) { carbon |= UInt32(controlKey) }
-        let isFunctionKey = Self.functionKeys.keys.contains(Int(event.keyCode))
+        let isFunctionKey = ShortcutText.functionKeys.keys.contains(Int(event.keyCode))
         guard carbon & UInt32(cmdKey | optionKey | controlKey) != 0 || isFunctionKey else { return nil }
         self.init(keyCode: UInt32(event.keyCode), modifiers: carbon)
     }
 
     /// For NSMenuItem: the key equivalent and its modifier mask, when the key has a plain character.
     var menuKeyEquivalent: (key: String, mask: NSEvent.ModifierFlags)? {
-        guard let key = Self.characters[Int(keyCode)] else { return nil }
+        guard let key = ShortcutText.characters[Int(keyCode)] else { return nil }
         var mask: NSEvent.ModifierFlags = []
         if modifiers & UInt32(cmdKey) != 0 { mask.insert(.command) }
         if modifiers & UInt32(shiftKey) != 0 { mask.insert(.shift) }
@@ -503,35 +479,6 @@ struct Shortcut: Equatable {
     }
 
     var displayString: String {
-        var text = ""
-        if modifiers & UInt32(controlKey) != 0 { text += "⌃" }
-        if modifiers & UInt32(optionKey) != 0 { text += "⌥" }
-        if modifiers & UInt32(shiftKey) != 0 { text += "⇧" }
-        if modifiers & UInt32(cmdKey) != 0 { text += "⌘" }
-        let code = Int(keyCode)
-        return text + (Self.characters[code] ?? Self.functionKeys[code] ?? Self.specialKeys[code] ?? "#\(code)")
+        ShortcutText.display(keyCode: keyCode, modifiers: modifiers)
     }
-
-    private static let characters: [Int: String] = [
-        kVK_ANSI_A: "A", kVK_ANSI_B: "B", kVK_ANSI_C: "C", kVK_ANSI_D: "D", kVK_ANSI_E: "E", kVK_ANSI_F: "F",
-        kVK_ANSI_G: "G", kVK_ANSI_H: "H", kVK_ANSI_I: "I", kVK_ANSI_J: "J", kVK_ANSI_K: "K", kVK_ANSI_L: "L",
-        kVK_ANSI_M: "M", kVK_ANSI_N: "N", kVK_ANSI_O: "O", kVK_ANSI_P: "P", kVK_ANSI_Q: "Q", kVK_ANSI_R: "R",
-        kVK_ANSI_S: "S", kVK_ANSI_T: "T", kVK_ANSI_U: "U", kVK_ANSI_V: "V", kVK_ANSI_W: "W", kVK_ANSI_X: "X",
-        kVK_ANSI_Y: "Y", kVK_ANSI_Z: "Z",
-        kVK_ANSI_0: "0", kVK_ANSI_1: "1", kVK_ANSI_2: "2", kVK_ANSI_3: "3", kVK_ANSI_4: "4",
-        kVK_ANSI_5: "5", kVK_ANSI_6: "6", kVK_ANSI_7: "7", kVK_ANSI_8: "8", kVK_ANSI_9: "9",
-        kVK_ANSI_Minus: "-", kVK_ANSI_Equal: "=", kVK_ANSI_LeftBracket: "[", kVK_ANSI_RightBracket: "]",
-        kVK_ANSI_Semicolon: ";", kVK_ANSI_Quote: "'", kVK_ANSI_Comma: ",", kVK_ANSI_Period: ".",
-        kVK_ANSI_Slash: "/", kVK_ANSI_Backslash: "\\", kVK_ANSI_Grave: "`",
-    ]
-
-    private static let functionKeys: [Int: String] = [
-        kVK_F1: "F1", kVK_F2: "F2", kVK_F3: "F3", kVK_F4: "F4", kVK_F5: "F5", kVK_F6: "F6",
-        kVK_F7: "F7", kVK_F8: "F8", kVK_F9: "F9", kVK_F10: "F10", kVK_F11: "F11", kVK_F12: "F12",
-    ]
-
-    private static let specialKeys: [Int: String] = [
-        kVK_Space: "Space", kVK_Return: "↩", kVK_Tab: "⇥", kVK_Delete: "⌫", kVK_Escape: "⎋",
-        kVK_LeftArrow: "←", kVK_RightArrow: "→", kVK_UpArrow: "↑", kVK_DownArrow: "↓",
-    ]
 }

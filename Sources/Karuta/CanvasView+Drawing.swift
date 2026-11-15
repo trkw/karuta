@@ -1,4 +1,5 @@
 import AppKit
+import KarutaCore
 
 // Drawing the canvas: the image, the annotations, the crop and the size label.
 extension CanvasView {
@@ -61,7 +62,7 @@ extension CanvasView {
     }
 
     private func drawSizeLabel(_ size: NSSize, below rect: NSRect) {
-        let text = "\(Int(size.width)) × \(Int(size.height))" as NSString
+        let text = SizeText.pair(Int(size.width), Int(size.height)) as NSString
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.white,
         ]

@@ -1,4 +1,5 @@
 import AppKit
+import KarutaCore
 @preconcurrency import ScreenCaptureKit
 
 /// A captured image plus the backing scale it was taken at (used for DPI metadata), and the app that was
@@ -53,7 +54,7 @@ enum Capturer {
     /// `rect` (AppKit global coordinates) as ScreenCaptureKit's sourceRect: points relative to the display,
     /// with a top-left origin.
     static func sourceRect(_ rect: CGRect, on screen: NSScreen) -> CGRect {
-        CGRect(x: rect.minX - screen.frame.minX, y: screen.frame.maxY - rect.maxY, width: rect.width, height: rect.height)
+        ScreenGeometry.sourceRect(rect, screenFrame: screen.frame)
     }
 
     /// Captures every display in full, so area selection can happen on a frozen screen (CleanShot's "Freeze screen").
@@ -147,8 +148,7 @@ enum Capturer {
 enum Geometry {
     /// Converts a CoreGraphics global rect (top-left origin) to AppKit global coordinates (bottom-left origin).
     static func appKitRect(fromCG rect: CGRect) -> NSRect {
-        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
-        return NSRect(x: rect.minX, y: primaryHeight - rect.maxY, width: rect.width, height: rect.height)
+        ScreenGeometry.appKitRect(fromCG: rect, primaryHeight: NSScreen.screens.first?.frame.height ?? 0)
     }
 }
 

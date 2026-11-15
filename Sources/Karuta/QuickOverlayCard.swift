@@ -1,4 +1,5 @@
 import AppKit
+import KarutaCore
 
 // MARK: - Card
 
@@ -19,9 +20,8 @@ final class OverlayCard: NSPanel {
         self.shot = shot
         screenFrame = screen.visibleFrame
 
-        let width = Preferences.overlaySize.width
-        let aspect = CGFloat(shot.image.height) / CGFloat(max(shot.image.width, 1))
-        let size = NSSize(width: width, height: min(max(width * aspect, width * 0.4), width))
+        let size = CardLayout.size(width: Preferences.overlaySize.width, imageWidth: shot.image.width,
+                                   imageHeight: shot.image.height)
 
         super.init(contentRect: NSRect(origin: .zero, size: size),
                    styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)

@@ -128,9 +128,8 @@ final class HistoryWindowController: NSWindowController, NSCollectionViewDataSou
 
     private func items(around index: Int) -> [CaptureHistory.Item] {
         // A right click on a selected item acts on the whole selection; otherwise on that item.
-        let selected = collection.selectionIndexPaths.map(\.item).sorted()
-        let indices = selected.contains(index) ? selected : [index]
-        return indices.filter { $0 < shown.count }.map { shown[$0] }
+        let selected = collection.selectionIndexPaths.map(\.item)
+        return HistoryRules.targets(around: index, selected: selected, count: shown.count).map { shown[$0] }
     }
 
     private func edit(at index: Int) {
@@ -246,7 +245,7 @@ private final class HistoryItem: NSCollectionViewItem {
 
     func show(_ item: CaptureHistory.Item) {
         thumbnail.image = CaptureHistory.thumbnail(for: item).map { NSImage(cgImage: $0, size: .zero) }
-        let size = "\(Int(Double(item.width) / item.scale)) × \(Int(Double(item.height) / item.scale))"
+        let size = SizeText.pair(Int(Double(item.width) / item.scale), Int(Double(item.height) / item.scale))
         caption.stringValue = "\(Self.formatter.string(from: item.date))  \(size)"
         caption.toolTip = [item.kind.title, item.app].compactMap { $0 }.joined(separator: " · ")
     }

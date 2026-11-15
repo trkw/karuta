@@ -1,12 +1,12 @@
 import AppKit
+import KarutaCore
 
 /// The backdrop behind a shot (CleanShot's Background tool): a gradient, a plain color, the desktop
 /// wallpaper or a chosen picture, as set in `Preferences`.
 @MainActor
 enum Backdrop {
     static func padding(for size: NSSize) -> CGFloat {
-        let ratio = CGFloat(Preferences.backdropPadding) / 100
-        return (max(12, min(size.width, size.height) * ratio)).rounded()
+        BackdropLayout.padding(percent: Preferences.backdropPadding, size: size)
     }
 
     static let gradients: [[NSColor]] = [

@@ -38,19 +38,18 @@ enum Exporter {
         guard let destination = CGImageDestinationCreateWithData(
             data as CFMutableData, type.identifier as CFString, 1, nil
         ) else { return nil }
-        let dpi = 72 * shot.scale
+        let dpi = ExportSettings.dpi(scale: shot.scale)
         var properties: [CFString: Any] = [kCGImagePropertyDPIWidth: dpi, kCGImagePropertyDPIHeight: dpi]
-        if type != .png { properties[kCGImageDestinationLossyCompressionQuality] = 0.9 }
+        if ExportSettings.usesQuality(type) { properties[kCGImageDestinationLossyCompressionQuality] = ExportSettings.lossyQuality }
         CGImageDestinationAddImage(destination, shot.image, properties as CFDictionary)
         return CGImageDestinationFinalize(destination) ? data as Data : nil
     }
 
     /// Scales a Retina shot down to 1x when that's chosen in Settings.
     private static func exported(_ shot: Shot) -> Shot {
-        guard Preferences.scaleRetina, shot.scale > 1 else { return shot }
-        let width = Int((CGFloat(shot.image.width) / shot.scale).rounded())
-        let height = Int((CGFloat(shot.image.height) / shot.scale).rounded())
-        guard width > 0, height > 0, let context = CGContext(
+        guard let (width, height) = ExportSettings.oneXSize(
+            width: shot.image.width, height: shot.image.height, scale: shot.scale, scaleRetina: Preferences.scaleRetina
+        ), let context = CGContext(
             data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
             space: shot.image.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue

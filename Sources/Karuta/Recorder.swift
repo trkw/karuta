@@ -1,6 +1,7 @@
 import AppKit
 import AVFoundation
 import ImageIO
+import KarutaCore
 import ScreenCaptureKit
 import UniformTypeIdentifiers
 
@@ -29,16 +30,6 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
         self.url = url
     }
 
-    /// The pixel size to record at: H.264 tops out around 4096 × 2304, so bigger areas are scaled down,
-    /// and both sides must be even.
-    static func outputSize(points: CGSize, scale: CGFloat) -> (width: Int, height: Int) {
-        var width = points.width * scale, height = points.height * scale
-        let fit = min(1, 4096 / max(width, 1), 2304 / max(height, 1))
-        width *= fit
-        height *= fit
-        return (max(2, Int(width) / 2 * 2), max(2, Int(height) / 2 * 2))
-    }
-
     /// `audio` adds the Mac's own sound (apps and videos, not Karuta) as an AAC track.
     func start(filter: SCContentFilter, configuration config: SCStreamConfiguration, frameRate: Int,
                audio: Bool) async throws {
@@ -53,8 +44,8 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
             AVVideoWidthKey: config.width,
             AVVideoHeightKey: config.height,
             AVVideoCompressionPropertiesKey: [
-                // About 0.1 bit per pixel at 30 fps: sharp text, reasonable files.
-                AVVideoAverageBitRateKey: max(2_000_000, config.width * config.height * 3 * frameRate / 30),
+                AVVideoAverageBitRateKey: RecordingBitrate.bitsPerSecond(width: config.width, height: config.height,
+                                                                         frameRate: frameRate),
                 AVVideoExpectedSourceFrameRateKey: frameRate,
                 AVVideoMaxKeyFrameIntervalKey: frameRate * 2,
                 AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
@@ -150,8 +141,8 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
     static func makeGIF(from movie: URL) async throws -> URL {
         let asset = AVURLAsset(url: movie)
         let duration = try await asset.load(.duration).seconds
-        let fps = 15.0
-        let count = max(1, min(Int(duration * fps), Int(120 * fps)))
+        let fps = GIFFrames.fps
+        let count = GIFFrames.count(duration: duration)
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
         generator.maximumSize = CGSize(width: 960, height: 4000)
@@ -161,13 +152,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
 
         // Never replace an earlier GIF: a Quick Access card or the clipboard may still point at it.
         let base = movie.deletingPathExtension()
-        var gif = base.appendingPathExtension("gif")
-        var n = 2
-        while FileManager.default.fileExists(atPath: gif.path) {
-            gif = base.deletingLastPathComponent()
-                .appendingPathComponent("\(base.lastPathComponent) (\(n)).gif")
-            n += 1
-        }
+        let gif = FileNaming.uniqueURL(in: base.deletingLastPathComponent(), base: base.lastPathComponent, extension: "gif")
         guard let destination = CGImageDestinationCreateWithURL(gif as CFURL, UTType.gif.identifier as CFString, count, nil)
         else { throw CocoaError(.fileWriteUnknown) }
         let loop = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]]

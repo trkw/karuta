@@ -23,4 +23,12 @@ public enum HistoryRules {
     public static func kind(forSegment index: Int) -> CaptureKind? {
         index == 0 ? nil : CaptureKind.allCases[index - 1]
     }
+
+    /// The shown items a right click at `index` acts on: the whole selection (in order) when the clicked item
+    /// is selected, otherwise that item alone. Indices past the `count` shown items are dropped.
+    public static func targets(around index: Int, selected: [Int], count: Int) -> [Int] {
+        let selected = selected.sorted()
+        let indices = selected.contains(index) ? selected : [index]
+        return indices.filter { $0 < count }
+    }
 }

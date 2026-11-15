@@ -1,5 +1,6 @@
 // `make test`: checks for KarutaCore. A plain executable because the Command Line Tools have
 // neither XCTest nor the Swift Testing macros. Exits 1 when any check fails.
+import Carbon.HIToolbox
 import Foundation
 import KarutaCore
 
@@ -278,6 +279,352 @@ equal("next: kept rows past a new footer come off", stitchNext(keptEnd: 100, lo:
 equal("next: nothing comes off when nothing is kept", stitchNext(keptEnd: 100, lo: 0, hi: 90, shift: 30, hasKept: false), "0,70")
 equal("next: kept end before the bottom band", stitchNext(keptEnd: 80, lo: 0, hi: 90, shift: 30), "0,50")
 equal("next: a start at or past hi adds nothing", stitchNext(keptEnd: 100, lo: 0, hi: 100, shift: 0), "0,100")
+
+// The recording's pixel size (K16), pinned from ScreenRecorder.outputSize before moving it into KarutaCore.
+func recordingSize(_ width: CGFloat, _ height: CGFloat, scale: CGFloat) -> String {
+    let size = RecordingSize.output(points: CGSize(width: width, height: height), scale: scale)
+    return "\(size.width)x\(size.height)"
+}
+equal("recording: points times the scale", recordingSize(800, 600, scale: 2), "1600x1200")
+equal("recording: odd sides round down to even", recordingSize(801, 601, scale: 1), "800x600")
+equal("recording: a 5K screen fits 4096 x 2304", recordingSize(2560, 1440, scale: 2), "4096x2304")
+equal("recording: a tall area fits the height, keeping the shape", recordingSize(1000, 3000, scale: 1), "768x2304")
+equal("recording: a wide area fits the width", recordingSize(6000, 100, scale: 1), "4096x68")
+equal("recording: fractions are dropped", recordingSize(100.7, 50.3, scale: 1), "100x50")
+equal("recording: a 1.5 scale", recordingSize(333, 333, scale: 1.5), "498x498")
+equal("recording: at least 2 x 2", recordingSize(1, 1, scale: 1), "2x2")
+equal("recording: an empty area is 2 x 2", recordingSize(0, 0, scale: 2), "2x2")
+
+// What a right click in the history window acts on (K17), pinned from HistoryWindow.items(around:)
+// before moving it into HistoryRules.
+func historyTargets(_ index: Int, selected: [Int], count: Int) -> String {
+    HistoryRules.targets(around: index, selected: selected, count: count).map(String.init).joined(separator: ",")
+}
+equal("targets: no selection is the clicked item", historyTargets(2, selected: [], count: 5), "2")
+equal("targets: inside the selection is the whole selection", historyTargets(1, selected: [3, 1], count: 5), "1,3")
+equal("targets: outside the selection is the clicked item only", historyTargets(4, selected: [1, 3], count: 5), "4")
+equal("targets: the selection is sorted", historyTargets(0, selected: [4, 0, 2], count: 5), "0,2,4")
+equal("targets: indices past the shown items are dropped", historyTargets(1, selected: [1, 7], count: 5), "1")
+equal("targets: a click past the end is nothing", historyTargets(5, selected: [], count: 5), "")
+equal("targets: nothing shown", historyTargets(0, selected: [0], count: 0), "")
+
+// The GIF made from a recording (K18), pinned from ScreenRecorder.makeGIF before using KarutaCore for it.
+// Its name: the old loop, written out here, and FileNaming.uniqueURL give the same file.
+func oldGIFName(_ movie: URL, existing: Set<String>) -> String {
+    let base = movie.deletingPathExtension()
+    var gif = base.appendingPathExtension("gif")
+    var n = 2
+    while existing.contains(gif.path) {
+        gif = base.deletingLastPathComponent().appendingPathComponent("\(base.lastPathComponent) (\(n)).gif")
+        n += 1
+    }
+    return gif.path
+}
+let gifMovie = URL(fileURLWithPath: "/tmp/Recordings/Karuta 2026-11-13 21.40.12.mov")
+for (label, existing) in [
+    ("none", Set<String>()),
+    ("the plain name", ["/tmp/Recordings/Karuta 2026-11-13 21.40.12.gif"]),
+    ("the plain name and (2)", ["/tmp/Recordings/Karuta 2026-11-13 21.40.12.gif", "/tmp/Recordings/Karuta 2026-11-13 21.40.12 (2).gif"]),
+    ("only (2)", ["/tmp/Recordings/Karuta 2026-11-13 21.40.12 (2).gif"]),
+] {
+    let base = gifMovie.deletingPathExtension()
+    let new = FileNaming.uniqueURL(in: base.deletingLastPathComponent(), base: base.lastPathComponent, extension: "gif") {
+        existing.contains($0.path)
+    }
+    equal("gif name: \(label) exists", new.path, oldGIFName(gifMovie, existing: existing))
+}
+// How many frames: 15 a second, at least 1, at most 120 seconds' worth.
+func gifFrames(_ duration: Double) -> String { "\(GIFFrames.count(duration: duration))" }
+equal("gif frames: 15 a second", gifFrames(1), "15")
+equal("gif frames: a part frame is dropped", gifFrames(2.5), "37")
+equal("gif frames: at least 1", gifFrames(0.05), "1")
+equal("gif frames: an empty movie still has 1", gifFrames(0), "1")
+equal("gif frames: 120 seconds", gifFrames(120), "1800")
+equal("gif frames: longer movies stop at 120 seconds", gifFrames(500), "1800")
+equal("gif frames: the rate", "\(GIFFrames.fps)", "15.0")
+
+// The image formats (K5, part 1), pinned from Preferences.ImageFormat before moving it into KarutaCore.
+// The raw values are what Settings stores, so they must not change.
+equal("format: the raw values (stored in Settings)", ImageFormat.allCases.map(\.rawValue).joined(separator: ","), "png,jpeg,heic")
+equal("format: menu order and titles", ImageFormat.allCases.map(\.title).joined(separator: ","), "PNG,JPEG,HEIC")
+equal("format: file extensions", ImageFormat.allCases.map(\.fileExtension).joined(separator: ","), "png,jpg,heic")
+equal("format: types", ImageFormat.allCases.map(\.utType.identifier).joined(separator: ","), "public.png,public.jpeg,public.heic")
+equal("format: an unknown stored value is no format", "\(ImageFormat(rawValue: "jpg") == nil)", "true")
+
+// The numbers used when a capture is written (K5, part 2), pinned from Exporter before moving them into
+// KarutaCore. The image work itself stays in the app.
+equal("export: 72 dpi at 1x", "\(ExportSettings.dpi(scale: 1))", "72.0")
+equal("export: 144 dpi on Retina", "\(ExportSettings.dpi(scale: 2))", "144.0")
+equal("export: lossy quality", "\(ExportSettings.lossyQuality)", "0.9")
+equal("export: quality only for lossy formats", ImageFormat.allCases.map { "\(ExportSettings.usesQuality($0.utType))" }.joined(separator: ","), "false,true,true")
+func oneX(_ width: Int, _ height: Int, scale: CGFloat, on: Bool = true) -> String {
+    ExportSettings.oneXSize(width: width, height: height, scale: scale, scaleRetina: on).map { "\($0.width)x\($0.height)" } ?? "keep"
+}
+equal("export: Retina to 1x halves the pixels", oneX(1600, 1200, scale: 2), "800x600")
+equal("export: odd pixels round to nearest", oneX(1601, 1199, scale: 2), "801x600")
+equal("export: a 1.5 scale", oneX(300, 301, scale: 1.5), "200x201")
+equal("export: off keeps the shot", oneX(1600, 1200, scale: 2, on: false), "keep")
+equal("export: a 1x shot is kept", oneX(1600, 1200, scale: 1), "keep")
+equal("export: a 1 pixel shot at 3x is kept (would be 0 wide)", oneX(1, 1, scale: 3), "keep")
+
+// The shapes the editor draws (K19), pinned from CanvasView+Mouse before moving them into KarutaCore.
+func shapeRect(_ a: CGPoint, _ b: CGPoint, square: Bool = false) -> String {
+    let r = DrawGeometry.rect(from: a, to: b, square: square)
+    return "\(r.minX),\(r.minY) \(r.width)x\(r.height)"
+}
+equal("shape: a drag down-right", shapeRect(CGPoint(x: 10, y: 20), CGPoint(x: 40, y: 60)), "10.0,20.0 30.0x40.0")
+equal("shape: any direction starts at the lower corner", shapeRect(CGPoint(x: 40, y: 60), CGPoint(x: 10, y: 20)), "10.0,20.0 30.0x40.0")
+equal("shape: Shift makes a square on the longer side", shapeRect(CGPoint(x: 10, y: 20), CGPoint(x: 40, y: 30), square: true), "10.0,20.0 30.0x30.0")
+equal("shape: a square keeps the drag's direction", shapeRect(CGPoint(x: 40, y: 60), CGPoint(x: 30, y: 20), square: true), "0.0,20.0 40.0x40.0")
+equal("shape: no drag is empty", shapeRect(CGPoint(x: 5, y: 5), CGPoint(x: 5, y: 5), square: true), "5.0,5.0 0.0x0.0")
+func snapped(_ p: CGPoint, from start: CGPoint = .zero) -> String {
+    let q = DrawGeometry.snap(p, from: start)
+    return String(format: "%.2f,%.2f", q.x, q.y)
+}
+equal("snap: nearly level becomes level, same length", snapped(CGPoint(x: 100, y: 10)), String(format: "%.2f,%.2f", hypot(Double(100), Double(10)), 0))
+equal("snap: near 45° becomes 45°", snapped(CGPoint(x: 100, y: 90)), String(format: "%.2f,%.2f", hypot(Double(100), Double(90)) / 2.0.squareRoot(), hypot(Double(100), Double(90)) / 2.0.squareRoot()))
+equal("snap: nearly upright becomes upright", snapped(CGPoint(x: -5, y: -100)), String(format: "%.2f,%.2f", 0.0, -hypot(Double(5), Double(100))))
+equal("snap: measured from the start", snapped(CGPoint(x: 110, y: 52), from: CGPoint(x: 10, y: 50)), String(format: "%.2f,%.2f", 10 + hypot(Double(100), Double(2)), 50.0))
+
+// Coordinate conversions (K20), pinned from Geometry.appKitRect and Capturer.sourceRect before moving
+// them into KarutaCore. They feed the capture rect, so the math must not change.
+func rectText(_ r: CGRect) -> String { "\(r.minX),\(r.minY) \(r.width)x\(r.height)" }
+equal("coords: CG top-left to AppKit bottom-left",
+      rectText(ScreenGeometry.appKitRect(fromCG: CGRect(x: 100, y: 50, width: 200, height: 100), primaryHeight: 1080)),
+      "100.0,930.0 200.0x100.0")
+equal("coords: a window on a screen above the main one",
+      rectText(ScreenGeometry.appKitRect(fromCG: CGRect(x: 0, y: -500, width: 100, height: 100), primaryHeight: 1080)),
+      "0.0,1480.0 100.0x100.0")
+equal("coords: no screens means a height of 0",
+      rectText(ScreenGeometry.appKitRect(fromCG: CGRect(x: 10, y: 20, width: 30, height: 40), primaryHeight: 0)),
+      "10.0,-60.0 30.0x40.0")
+equal("coords: source rect on the main screen",
+      rectText(ScreenGeometry.sourceRect(CGRect(x: 100, y: 200, width: 300, height: 100), screenFrame: CGRect(x: 0, y: 0, width: 1440, height: 900))),
+      "100.0,600.0 300.0x100.0")
+equal("coords: source rect on a screen to the right and lower",
+      rectText(ScreenGeometry.sourceRect(CGRect(x: 1500, y: 0, width: 100, height: 100), screenFrame: CGRect(x: 1440, y: -200, width: 1920, height: 1080))),
+      "60.0,780.0 100.0x100.0")
+equal("coords: the whole screen is the source rect from 0",
+      rectText(ScreenGeometry.sourceRect(CGRect(x: 1440, y: -200, width: 1920, height: 1080), screenFrame: CGRect(x: 1440, y: -200, width: 1920, height: 1080))),
+      "0.0,0.0 1920.0x1080.0")
+
+// Where a Quick Access card sits (K21), pinned from QuickOverlay.x(for:hidden:) before moving it into KarutaCore.
+let cardScreen = CGRect(x: 0, y: 0, width: 1440, height: 900)
+func cardX(onRight: Bool, hidden: Bool, gap: CGFloat = 20, screen: CGRect = cardScreen) -> String {
+    "\(CardLayout.x(screenFrame: screen, cardWidth: 300, onRight: onRight, hidden: hidden, margin: 16, gap: gap))"
+}
+equal("card: left, shown, inside the margin", cardX(onRight: false, hidden: false), "16.0")
+equal("card: left, hidden, past the edge and the gap", cardX(onRight: false, hidden: true), "-320.0")
+equal("card: right, shown, inside the margin", cardX(onRight: true, hidden: false), "1124.0")
+equal("card: right, hidden, past the edge and the gap", cardX(onRight: true, hidden: true), "1460.0")
+equal("card: hidden with no gap (where it slides in from)", cardX(onRight: false, hidden: true, gap: 0), "-300.0")
+equal("card: on a second screen to the right", cardX(onRight: true, hidden: false, screen: CGRect(x: 1440, y: 0, width: 1920, height: 1080)), "3044.0")
+
+// The next counter number in the editor (K22), pinned from CanvasView.nextCounter before moving it into KarutaCore.
+func nextCounter(_ existing: [Int], override: Int? = nil) -> String {
+    "\(CounterNumbers.next(existing: existing, override: override))"
+}
+equal("counter: the first is 1", nextCounter([]), "1")
+equal("counter: one past the highest", nextCounter([1, 2, 3]), "4")
+equal("counter: gaps are not filled", nextCounter([1, 5]), "6")
+equal("counter: order does not matter", nextCounter([3, 1, 2]), "4")
+equal("counter: a number set by hand wins", nextCounter([1, 2], override: 10), "10")
+equal("counter: a set number of 0 is kept", nextCounter([1, 2], override: 0), "0")
+equal("counter: negative numbers count as none", nextCounter([-3]), "1")
+equal("counter: setting a number below 0 keeps 0", "\(CounterNumbers.clamped(-5))", "0")
+equal("counter: setting a number keeps it", "\(CounterNumbers.clamped(7))", "7")
+
+// Stroke widths (K23), pinned from CanvasView.widthSteps and the 1–6 keys before moving them into KarutaCore.
+equal("width: the six steps", StrokeWidth.steps.map { "\($0)" }.joined(separator: ","), "1.0,2.0,4.0,6.0,8.0,12.0")
+equal("width: key 1 is the thinnest", "\(StrokeWidth.forKey("1") ?? -1)", "1.0")
+equal("width: key 4", "\(StrokeWidth.forKey("4") ?? -1)", "6.0")
+equal("width: key 6 is the thickest", "\(StrokeWidth.forKey("6") ?? -1)", "12.0")
+equal("width: key 0 is not a width", "\(StrokeWidth.forKey("0") == nil)", "true")
+equal("width: key 7 is not a width", "\(StrokeWidth.forKey("7") == nil)", "true")
+equal("width: a letter is not a width", "\(StrokeWidth.forKey("a") == nil)", "true")
+equal("width: two digits are not a width", "\(StrokeWidth.forKey("12") == nil)", "true")
+equal("width: no key is not a width", "\(StrokeWidth.forKey("") == nil)", "true")
+
+// Where a pin window opens (K24), pinned from PinWindow.init before moving it into KarutaCore:
+// the capture's real size, shrunk to fit 80% of the visible screen, centred on the card, kept on screen.
+let pinVisible = CGRect(x: 0, y: 0, width: 1440, height: 900)
+func pinFrame(_ width: CGFloat, _ height: CGFloat, around card: CGRect, visible: CGRect = pinVisible) -> String {
+    rectText(PinLayout.frame(pointSize: CGSize(width: width, height: height), around: card, visible: visible))
+}
+equal("pin: a small capture opens at its real size, centred on the card",
+      pinFrame(200, 100, around: CGRect(x: 100, y: 100, width: 300, height: 200)), "150.0,150.0 200.0x100.0")
+equal("pin: a wide capture shrinks to 80% of the screen's width",
+      pinFrame(1600, 400, around: CGRect(x: 0, y: 0, width: 1000, height: 1000), visible: CGRect(x: 0, y: 0, width: 1000, height: 1000)),
+      "100.0,400.0 800.0x200.0")
+equal("pin: a tall capture shrinks to 80% of the screen's height",
+      pinFrame(500, 2000, around: CGRect(x: 0, y: 0, width: 1000, height: 1000), visible: CGRect(x: 0, y: 0, width: 1000, height: 1000)),
+      "400.0,100.0 200.0x800.0")
+equal("pin: pushed back from the right edge",
+      pinFrame(200, 100, around: CGRect(x: 1350, y: 400, width: 100, height: 100)), "1240.0,400.0 200.0x100.0")
+equal("pin: pushed up from the bottom-left corner, above the Dock",
+      pinFrame(200, 100, around: CGRect(x: 0, y: 0, width: 100, height: 20), visible: CGRect(x: 0, y: 25, width: 1440, height: 850)),
+      "0.0,25.0 200.0x100.0")
+equal("pin: on a screen to the left of the main one",
+      pinFrame(400, 300, around: CGRect(x: -1010, y: 450, width: 100, height: 100), visible: CGRect(x: -1920, y: 0, width: 1920, height: 1055)),
+      "-1160.0,350.0 400.0x300.0")
+
+// A pin window's scroll rules (K25), pinned from PinWindow.scrollWheel before moving them into KarutaCore:
+// a mouse wheel counts 8 times, scrolling zooms (width 60–4000, aspect kept, centre kept), ⌥ changes opacity (0.2–1).
+func r1(_ r: CGRect) -> String { String(format: "%.1f,%.1f %.1fx%.1f", r.minX, r.minY, r.width, r.height) }
+equal("pin scroll: a trackpad's delta is used as it is", "\(PinLayout.scrollDelta(3, precise: true))", "3.0")
+equal("pin scroll: a mouse wheel's delta counts 8 times", "\(PinLayout.scrollDelta(3, precise: false))", "24.0")
+equal("pin scroll: down on a wheel too", "\(PinLayout.scrollDelta(-1, precise: false))", "-8.0")
+equal("pin opacity: a step of delta / 200", String(format: "%.2f", PinLayout.opacity(0.5, delta: -40)), "0.30")
+equal("pin opacity: no more than 1", String(format: "%.2f", PinLayout.opacity(1, delta: 20)), "1.00")
+equal("pin opacity: no less than 0.2", String(format: "%.2f", PinLayout.opacity(0.3, delta: -100)), "0.20")
+let pinZoomFrame = CGRect(x: 100, y: 100, width: 200, height: 100)
+equal("pin zoom: 1 + delta / 300 times wider, aspect and centre kept",
+      r1(PinLayout.zoomed(pinZoomFrame, delta: 30, aspect: 0.5)), "90.0,95.0 220.0x110.0")
+equal("pin zoom: no narrower than 60",
+      r1(PinLayout.zoomed(CGRect(x: 0, y: 0, width: 61, height: 61), delta: -300, aspect: 1)), "0.5,0.5 60.0x60.0")
+equal("pin zoom: no wider than 4000",
+      r1(PinLayout.zoomed(CGRect(x: 0, y: 0, width: 3900, height: 1950), delta: 300, aspect: 0.5)), "-50.0,-25.0 4000.0x2000.0")
+
+// A Quick Access card's size (K26), pinned from QuickOverlayCard.init before moving it into CardLayout:
+// the width from the settings, the height from the image's aspect, kept between 0.4 and 1 times the width.
+func cardSize(_ imageWidth: Int, _ imageHeight: Int, width: CGFloat = 300) -> String {
+    let size = CardLayout.size(width: width, imageWidth: imageWidth, imageHeight: imageHeight)
+    return "\(size.width)x\(size.height)"
+}
+equal("card size: a 16:9 capture keeps its shape", cardSize(1600, 900), "300.0x168.75")
+equal("card size: a wide strip is at least 0.4 of the width", cardSize(3000, 100), "300.0x120.0")
+equal("card size: a tall capture is at most as high as wide", cardSize(100, 1000), "300.0x300.0")
+equal("card size: a square is square", cardSize(500, 500), "300.0x300.0")
+equal("card size: an image 0 wide counts as 1 wide", cardSize(0, 50), "300.0x300.0")
+equal("card size: an image 0 high is at the 0.4 floor", cardSize(100, 0), "300.0x120.0")
+equal("card size: follows the width setting", cardSize(1600, 900, width: 200), "200.0x112.5")
+
+// Where the scrolling capture's panel sits (K27), pinned from ScrollPanel.init before moving it into KarutaCore:
+// 12pt under the area, above it when that would leave the screen, and 8pt in from the screen's sides.
+let panelVisible = CGRect(x: 0, y: 0, width: 1440, height: 875)
+func panelOrigin(_ area: CGRect, visible: CGRect = panelVisible) -> String {
+    let p = PanelLayout.scrollPanelOrigin(below: area, panelSize: CGSize(width: 420, height: 44), visible: visible)
+    return "\(p.x),\(p.y)"
+}
+equal("scroll panel: centred 12pt under the area", panelOrigin(CGRect(x: 400, y: 400, width: 400, height: 300)), "390.0,344.0")
+equal("scroll panel: above the area when below would leave the screen",
+      panelOrigin(CGRect(x: 400, y: 30, width: 400, height: 300)), "390.0,342.0")
+equal("scroll panel: an area filling the screen puts it at the top, inside",
+      panelOrigin(CGRect(x: 0, y: 0, width: 1440, height: 875)), "510.0,831.0")
+equal("scroll panel: an area above the visible frame (as today) puts it 12pt up from the area's bottom",
+      panelOrigin(CGRect(x: 400, y: 900, width: 100, height: 50)), "240.0,912.0")
+equal("scroll panel: 8pt in from the left", panelOrigin(CGRect(x: 0, y: 400, width: 100, height: 100)), "8.0,344.0")
+equal("scroll panel: 8pt in from the right", panelOrigin(CGRect(x: 1400, y: 400, width: 40, height: 100)), "1012.0,344.0")
+equal("scroll panel: on a screen to the left",
+      panelOrigin(CGRect(x: -1000, y: 400, width: 400, height: 300), visible: CGRect(x: -1920, y: 0, width: 1920, height: 1055)),
+      "-1010.0,344.0")
+
+// The settings' colour hex (K28), pinned from Preferences.backdropColor's setter and Preferences.hex(of:) before
+// moving their one formula into KarutaCore. These strings are what is saved, so they must not change.
+equal("colour byte: 0 is 0", "\(ColorHex.byte(0))", "0")
+equal("colour byte: 1 is 255", "\(ColorHex.byte(1))", "255")
+equal("colour byte: a half rounds up", "\(ColorHex.byte(0.5))", "128")
+equal("colour byte: below 0 is 0", "\(ColorHex.byte(-0.2))", "0")
+equal("colour byte: above 1 is 255", "\(ColorHex.byte(1.3))", "255")
+equal("backdrop hex: rrggbb", ColorHex.rgb(red: 1, green: 0.5, blue: 0), "ff8000")
+equal("backdrop hex: not padded (black is \"0\"), as saved today", ColorHex.rgb(red: 0, green: 0, blue: 0), "0")
+equal("backdrop hex: not padded (green is \"ff00\")", ColorHex.rgb(red: 0, green: 1, blue: 0), "ff00")
+equal("saved colour hex: rrggbbaa", ColorHex.rgba(red: 0.2, green: 0.4, blue: 0.6, alpha: 0.8), "336699cc")
+equal("saved colour hex: always 8 digits", ColorHex.rgba(red: 0, green: 0, blue: 0, alpha: 0), "00000000")
+equal("saved colour hex: opaque red", ColorHex.rgba(red: 1, green: 0, blue: 0, alpha: 1), "ff0000ff")
+
+// The backdrop's padding (K29), pinned from Backdrop.padding(for:) before moving it into KarutaCore:
+// the setting's percent of the image's shorter side, at least 12pt, rounded.
+func backdropPadding(_ percent: Int, _ width: CGFloat, _ height: CGFloat) -> String {
+    "\(BackdropLayout.padding(percent: percent, size: CGSize(width: width, height: height)))"
+}
+equal("backdrop padding: a percent of the shorter side", backdropPadding(10, 800, 600), "60.0")
+equal("backdrop padding: the default 8%", backdropPadding(8, 1200, 900), "72.0")
+equal("backdrop padding: a tall image uses its width", backdropPadding(10, 300, 1000), "30.0")
+equal("backdrop padding: at least 12pt", backdropPadding(10, 100, 50), "12.0")
+equal("backdrop padding: 0% is still 12pt", backdropPadding(0, 800, 600), "12.0")
+equal("backdrop padding: rounded down", backdropPadding(7, 333, 500), "23.0")
+equal("backdrop padding: a half rounds up", backdropPadding(5, 1010, 1010), "51.0")
+
+// Guessing a shot's scale (K30), pinned from Recents.swift before moving it into KarutaCore: from a pasted
+// image (pixels per point, rounded, at least 1) and from a file's DPI (DPI / 72, rounded, at least 1).
+func scaleFromPixels(_ pixels: Int, _ points: CGFloat) -> String { "\(ShotScale.fromPixels(pixelWidth: pixels, pointWidth: points))" }
+func scaleFromDPI(_ dpi: Double) -> String { "\(ShotScale.fromDPI(dpi))" }
+equal("scale from pixels: Retina is 2", scaleFromPixels(2000, 1000), "2.0")
+equal("scale from pixels: same size is 1", scaleFromPixels(1000, 1000), "1.0")
+equal("scale from pixels: a half rounds up", scaleFromPixels(1500, 1000), "2.0")
+equal("scale from pixels: a little more rounds down", scaleFromPixels(1200, 1000), "1.0")
+equal("scale from pixels: smaller than the points is still 1", scaleFromPixels(500, 1000), "1.0")
+equal("scale from pixels: 0 points count as 1", scaleFromPixels(3000, 0), "3000.0")
+equal("scale from DPI: 72 is 1", scaleFromDPI(72), "1.0")
+equal("scale from DPI: 144 is 2", scaleFromDPI(144), "2.0")
+equal("scale from DPI: 216 is 3", scaleFromDPI(216), "3.0")
+equal("scale from DPI: a half rounds up", scaleFromDPI(108), "2.0")
+equal("scale from DPI: a little more rounds down", scaleFromDPI(90), "1.0")
+equal("scale from DPI: low DPI is still 1", scaleFromDPI(36), "1.0")
+equal("scale from DPI: 0 is 1", scaleFromDPI(0), "1.0")
+
+// Reading the settings' colour hex (K31, the other half of K28), pinned from Preferences.backdropColor's getter
+// and Preferences.color(hex:) before moving the parsing into KarutaCore. Saved strings must keep reading the same.
+func bytes(_ b: [UInt32]?) -> String { b.map { $0.map(String.init).joined(separator: ",") } ?? "none" }
+equal("read backdrop hex: rrggbb", bytes(ColorHex.rgbBytes("ff8000")), "255,128,0")
+equal("read backdrop hex: \"0\" as saved for black", bytes(ColorHex.rgbBytes("0")), "0,0,0")
+equal("read backdrop hex: \"ff00\" as saved for green", bytes(ColorHex.rgbBytes("ff00")), "0,255,0")
+equal("read backdrop hex: upper case", bytes(ColorHex.rgbBytes("FF8000")), "255,128,0")
+equal("read backdrop hex: 7 digits keep the low 6", bytes(ColorHex.rgbBytes("1abcdef")), "171,205,239")
+equal("read backdrop hex: 9 digits do not fit", bytes(ColorHex.rgbBytes("123456789")), "none")
+equal("read backdrop hex: not hex", bytes(ColorHex.rgbBytes("zz")), "none")
+equal("read backdrop hex: empty", bytes(ColorHex.rgbBytes("")), "none")
+equal("read saved colour hex: rrggbbaa", bytes(ColorHex.rgbaBytes("336699cc")), "51,102,153,204")
+equal("read saved colour hex: written and read back", bytes(ColorHex.rgbaBytes(ColorHex.rgba(red: 1, green: 0, blue: 0, alpha: 1))), "255,0,0,255")
+equal("read saved colour hex: 7 digits are not read", bytes(ColorHex.rgbaBytes("336699c")), "none")
+equal("read saved colour hex: 9 digits are not read", bytes(ColorHex.rgbaBytes("336699ccd")), "none")
+equal("read saved colour hex: not hex", bytes(ColorHex.rgbaBytes("gggggggg")), "none")
+
+// How a shortcut is shown in the settings (K32), pinned from Shortcut.displayString before moving it into
+// KarutaCore: the modifier symbols in the order ⌃⌥⇧⌘, then the key's name from three tables, or "#code".
+func shortcutText(_ key: Int, _ modifiers: Int = 0) -> String {
+    ShortcutText.display(keyCode: UInt32(key), modifiers: UInt32(modifiers))
+}
+equal("shortcut: ⌘⇧4 (the area default)", shortcutText(kVK_ANSI_4, cmdKey | shiftKey), "⇧⌘4")
+equal("shortcut: every modifier, in ⌃⌥⇧⌘ order", shortcutText(kVK_ANSI_A, cmdKey | shiftKey | optionKey | controlKey), "⌃⌥⇧⌘A")
+equal("shortcut: letters are upper case", shortcutText(kVK_ANSI_Z, cmdKey), "⌘Z")
+equal("shortcut: a symbol key", shortcutText(kVK_ANSI_Slash, optionKey), "⌥/")
+equal("shortcut: a function key alone", shortcutText(kVK_F5), "F5")
+equal("shortcut: F12", shortcutText(kVK_F12, controlKey), "⌃F12")
+equal("shortcut: space", shortcutText(kVK_Space, cmdKey), "⌘Space")
+equal("shortcut: an arrow", shortcutText(kVK_LeftArrow, optionKey), "⌥←")
+equal("shortcut: escape", shortcutText(kVK_Escape), "⎋")
+equal("shortcut: a key in no table shows its code", shortcutText(kVK_Home, cmdKey), "⌘#\(kVK_Home)")
+equal("shortcut: function keys are known", "\(ShortcutText.functionKeys[kVK_F1] ?? "")", "F1")
+equal("shortcut: menu characters are known", "\(ShortcutText.characters[kVK_ANSI_C] ?? "")", "C")
+
+// The editor's zoom choices (K33), pinned from Editor.zoomChoices before moving them into KarutaCore.
+equal("zoom: the labels, in order", EditorZoom.choices.map(\.label).joined(separator: ","), "フィット,50%,100%,200%")
+equal("zoom: the scales, fit is none", EditorZoom.choices.map { $0.scale.map { "\($0)" } ?? "fit" }.joined(separator: ","), "fit,0.5,1.0,2.0")
+
+// The recording's elapsed time in the menu bar (K34), pinned from AppDelegate+Recording before moving it into
+// KarutaCore: " m:ss" with a leading space, minutes not rolled over into hours.
+equal("recording clock: the start", RecordingClock.text(elapsed: 0), " 0:00")
+equal("recording clock: 59 seconds", RecordingClock.text(elapsed: 59), " 0:59")
+equal("recording clock: one minute", RecordingClock.text(elapsed: 60), " 1:00")
+equal("recording clock: seconds keep two digits", RecordingClock.text(elapsed: 605), " 10:05")
+equal("recording clock: past an hour it still counts minutes", RecordingClock.text(elapsed: 3725), " 62:05")
+
+// The recording's bit rate (K36), pinned from Recorder.start before moving it into KarutaCore: about 0.1 bit per
+// pixel at 30 fps, never below 2,000,000, multiplied before the integer division.
+equal("bit rate: small areas stop at 2,000,000", "\(RecordingBitrate.bitsPerSecond(width: 640, height: 480, frameRate: 30))", "2000000")
+equal("bit rate: 1920 × 1080 at 30 fps", "\(RecordingBitrate.bitsPerSecond(width: 1920, height: 1080, frameRate: 30))", "6220800")
+equal("bit rate: 1920 × 1080 at 60 fps", "\(RecordingBitrate.bitsPerSecond(width: 1920, height: 1080, frameRate: 60))", "12441600")
+equal("bit rate: the division truncates", "\(RecordingBitrate.bitsPerSecond(width: 1001, height: 1001, frameRate: 31))", "3106203")
+equal("bit rate: just above the floor", "\(RecordingBitrate.bitsPerSecond(width: 1000, height: 667, frameRate: 30))", "2001000")
+
+// How sizes are shown (K35), pinned from HistoryWindow, ScrollPanel and CanvasView+Drawing before their text moves
+// into KarutaCore. Each place still turns pixels into points itself (they differ, see docs/refactoring.md K35).
+equal("size text: width × height", SizeText.pair(1280, 720), "1280 × 720")
+equal("size text: small sizes", SizeText.pair(1, 2), "1 × 2")
+equal("size text: the scrolling capture's height", SizeText.height(2400), "高さ 2400 pt")
+equal("size text: no height yet", SizeText.height(0), "高さ 0 pt")
 
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)

@@ -1,4 +1,5 @@
 import AppKit
+import KarutaCore
 
 // Looks: the style, colour and width that new and selected marks get.
 extension CanvasView {
@@ -36,14 +37,13 @@ extension CanvasView {
 
     var nextCounter: Int {
         get {
-            if let counterOverride { return counterOverride }
-            var highest = 0
-            for annotation in annotations {
-                if case let .counter(_, n) = annotation.kind { highest = max(highest, n) }
+            let numbers = annotations.compactMap { annotation -> Int? in
+                if case let .counter(_, n) = annotation.kind { return n }
+                return nil
             }
-            return highest + 1
+            return CounterNumbers.next(existing: numbers, override: counterOverride)
         }
-        set { counterOverride = max(0, newValue) }
+        set { counterOverride = CounterNumbers.clamped(newValue) }
     }
 
     /// The look the toolbar shows: the selected mark's own, else the one new marks get.

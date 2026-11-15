@@ -1,4 +1,5 @@
 import AppKit
+import KarutaCore
 
 /// CleanShot-style Quick Access Overlay: one card per capture, stacked in the bottom-left corner.
 /// Hovering a card reveals Copy / Save and corner buttons (close, edit, pin); dragging it drops the
@@ -117,11 +118,8 @@ final class QuickOverlay {
 
     /// Where a card sits: just inside its side of the screen, or (hidden) just past that edge.
     private func x(for card: OverlayCard, hidden: Bool, gap: CGFloat = 20) -> CGFloat {
-        let screen = card.screenFrame
-        if card.onRight {
-            return hidden ? screen.maxX + gap : screen.maxX - Self.margin - card.frame.width
-        }
-        return hidden ? screen.minX - card.frame.width - gap : screen.minX + Self.margin
+        CardLayout.x(screenFrame: card.screenFrame, cardWidth: card.frame.width, onRight: card.onRight,
+                     hidden: hidden, margin: Self.margin, gap: gap)
     }
 
     private func setStackHidden(_ hidden: Bool) {

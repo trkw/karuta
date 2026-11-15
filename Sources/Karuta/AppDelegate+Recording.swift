@@ -1,4 +1,5 @@
 import AppKit
+import KarutaCore
 import ScreenCaptureKit
 
 // Screen recording: start and stop, the menu bar timer, and handing the video to Quick Access.
@@ -59,14 +60,14 @@ extension AppDelegate {
                     else { throw CaptureError.displayNotFound }
                     filter = Capturer.recordingFilter(for: display, content: content)
                     config.sourceRect = Capturer.sourceRect(rect, on: areaScreen)
-                    let size = ScreenRecorder.outputSize(points: rect.size, scale: areaScreen.backingScaleFactor)
+                    let size = RecordingSize.output(points: rect.size, scale: areaScreen.backingScaleFactor)
                     config.width = size.width
                     config.height = size.height
                     frame = rect
                     screen = areaScreen
                 case let .window(window):
                     filter = SCContentFilter(desktopIndependentWindow: window)
-                    let size = ScreenRecorder.outputSize(points: filter.contentRect.size, scale: CGFloat(filter.pointPixelScale))
+                    let size = RecordingSize.output(points: filter.contentRect.size, scale: CGFloat(filter.pointPixelScale))
                     config.width = size.width
                     config.height = size.height
                     frame = Geometry.appKitRect(fromCG: window.frame)
@@ -173,7 +174,7 @@ extension AppDelegate {
         button.contentTintColor = .systemRed
         button.imagePosition = .imageLeading
         button.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-        button.title = String(format: " %d:%02d", elapsed / 60, elapsed % 60)
+        button.title = RecordingClock.text(elapsed: elapsed)
         button.toolTip = "クリックで収録を停止"
         button.target = self
         button.action = #selector(stopRecordingClicked)
