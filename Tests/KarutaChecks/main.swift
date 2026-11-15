@@ -603,5 +603,13 @@ equal("shortcut: menu characters are known", "\(ShortcutText.characters[kVK_ANSI
 equal("zoom: the labels, in order", EditorZoom.choices.map(\.label).joined(separator: ","), "フィット,50%,100%,200%")
 equal("zoom: the scales, fit is none", EditorZoom.choices.map { $0.scale.map { "\($0)" } ?? "fit" }.joined(separator: ","), "fit,0.5,1.0,2.0")
 
+// The recording's elapsed time in the menu bar (K34), pinned from AppDelegate+Recording before moving it into
+// KarutaCore: " m:ss" with a leading space, minutes not rolled over into hours.
+equal("recording clock: the start", RecordingClock.text(elapsed: 0), " 0:00")
+equal("recording clock: 59 seconds", RecordingClock.text(elapsed: 59), " 0:59")
+equal("recording clock: one minute", RecordingClock.text(elapsed: 60), " 1:00")
+equal("recording clock: seconds keep two digits", RecordingClock.text(elapsed: 605), " 10:05")
+equal("recording clock: past an hour it still counts minutes", RecordingClock.text(elapsed: 3725), " 62:05")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)

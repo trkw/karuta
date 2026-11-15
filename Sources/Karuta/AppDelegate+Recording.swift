@@ -174,7 +174,7 @@ extension AppDelegate {
         button.contentTintColor = .systemRed
         button.imagePosition = .imageLeading
         button.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-        button.title = String(format: " %d:%02d", elapsed / 60, elapsed % 60)
+        button.title = RecordingClock.text(elapsed: elapsed)
         button.toolTip = "クリックで収録を停止"
         button.target = self
         button.action = #selector(stopRecordingClicked)
