@@ -611,6 +611,14 @@ equal("recording clock: one minute", RecordingClock.text(elapsed: 60), " 1:00")
 equal("recording clock: seconds keep two digits", RecordingClock.text(elapsed: 605), " 10:05")
 equal("recording clock: past an hour it still counts minutes", RecordingClock.text(elapsed: 3725), " 62:05")
 
+// The recording's bit rate (K36), pinned from Recorder.start before moving it into KarutaCore: about 0.1 bit per
+// pixel at 30 fps, never below 2,000,000, multiplied before the integer division.
+equal("bit rate: small areas stop at 2,000,000", "\(RecordingBitrate.bitsPerSecond(width: 640, height: 480, frameRate: 30))", "2000000")
+equal("bit rate: 1920 × 1080 at 30 fps", "\(RecordingBitrate.bitsPerSecond(width: 1920, height: 1080, frameRate: 30))", "6220800")
+equal("bit rate: 1920 × 1080 at 60 fps", "\(RecordingBitrate.bitsPerSecond(width: 1920, height: 1080, frameRate: 60))", "12441600")
+equal("bit rate: the division truncates", "\(RecordingBitrate.bitsPerSecond(width: 1001, height: 1001, frameRate: 31))", "3106203")
+equal("bit rate: just above the floor", "\(RecordingBitrate.bitsPerSecond(width: 1000, height: 667, frameRate: 30))", "2001000")
+
 // How sizes are shown (K35), pinned from HistoryWindow, ScrollPanel and CanvasView+Drawing before their text moves
 // into KarutaCore. Each place still turns pixels into points itself (they differ, see docs/refactoring.md K35).
 equal("size text: width × height", SizeText.pair(1280, 720), "1280 × 720")

@@ -44,8 +44,8 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
             AVVideoWidthKey: config.width,
             AVVideoHeightKey: config.height,
             AVVideoCompressionPropertiesKey: [
-                // About 0.1 bit per pixel at 30 fps: sharp text, reasonable files.
-                AVVideoAverageBitRateKey: max(2_000_000, config.width * config.height * 3 * frameRate / 30),
+                AVVideoAverageBitRateKey: RecordingBitrate.bitsPerSecond(width: config.width, height: config.height,
+                                                                         frameRate: frameRate),
                 AVVideoExpectedSourceFrameRateKey: frameRate,
                 AVVideoMaxKeyFrameIntervalKey: frameRate * 2,
                 AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
