@@ -61,7 +61,7 @@ final class ScrollPanel: NSPanel {
     }
 
     func show(height pixels: Int, scale: CGFloat) {
-        size.stringValue = "高さ \(Int(CGFloat(pixels) / max(scale, 1))) pt"
+        size.stringValue = SizeText.height(Int(CGFloat(pixels) / max(scale, 1)))
     }
 
     func showMessage(_ text: String) {

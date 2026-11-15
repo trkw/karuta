@@ -245,7 +245,7 @@ private final class HistoryItem: NSCollectionViewItem {
 
     func show(_ item: CaptureHistory.Item) {
         thumbnail.image = CaptureHistory.thumbnail(for: item).map { NSImage(cgImage: $0, size: .zero) }
-        let size = "\(Int(Double(item.width) / item.scale)) × \(Int(Double(item.height) / item.scale))"
+        let size = SizeText.pair(Int(Double(item.width) / item.scale), Int(Double(item.height) / item.scale))
         caption.stringValue = "\(Self.formatter.string(from: item.date))  \(size)"
         caption.toolTip = [item.kind.title, item.app].compactMap { $0 }.joined(separator: " · ")
     }

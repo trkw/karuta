@@ -611,5 +611,12 @@ equal("recording clock: one minute", RecordingClock.text(elapsed: 60), " 1:00")
 equal("recording clock: seconds keep two digits", RecordingClock.text(elapsed: 605), " 10:05")
 equal("recording clock: past an hour it still counts minutes", RecordingClock.text(elapsed: 3725), " 62:05")
 
+// How sizes are shown (K35), pinned from HistoryWindow, ScrollPanel and CanvasView+Drawing before their text moves
+// into KarutaCore. Each place still turns pixels into points itself (they differ, see docs/refactoring.md K35).
+equal("size text: width × height", SizeText.pair(1280, 720), "1280 × 720")
+equal("size text: small sizes", SizeText.pair(1, 2), "1 × 2")
+equal("size text: the scrolling capture's height", SizeText.height(2400), "高さ 2400 pt")
+equal("size text: no height yet", SizeText.height(0), "高さ 0 pt")
+
 print(failures == 0 ? "all checks passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)
